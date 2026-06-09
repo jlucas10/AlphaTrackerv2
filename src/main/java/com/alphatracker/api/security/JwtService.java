@@ -49,7 +49,7 @@ public class JwtService {
                 .compact();
     }
 
-    // Why: Validates that the token belongs to the user trying to use it, and isn't expired.
+    // Validates that the token belongs to the user trying to use it, and isn't expired.
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
