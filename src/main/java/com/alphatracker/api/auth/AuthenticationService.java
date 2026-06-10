@@ -27,7 +27,7 @@ public class AuthenticationService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .email(request.getEmail())
-                // Why: Encoding the raw password using the BCrypt bean we set up in ApplicationConfig
+                // Encoding the raw password using the BCrypt bean we set up in ApplicationConfig
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.USER) // Assigning a default client role
                 .build();
