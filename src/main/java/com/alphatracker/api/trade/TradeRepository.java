@@ -10,5 +10,5 @@ public interface TradeRepository extends JpaRepository<Trade, Long>{
     // Spring Data JPA will automatically analyze 
     // this method name and generate the SQL query behind the scenes:
     // "SELECT * FROM trade WHERE user_id = ?"
-    List<Trade> findByUserID(Long userId);
+    List<Trade> findByUserId(Long userId);
 }
