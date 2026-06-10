@@ -16,12 +16,12 @@ import com.alphatracker.api.user.UserRepository; // Assuming this is where your 
 import lombok.RequiredArgsConstructor;
 
 @Configuration
-@RequiredArgsConstructor // Why: Injects our UserRepository automatically via constructor
+@RequiredArgsConstructor // Injects our UserRepository automatically via constructor
 public class ApplicationConfig {
 
     private final UserRepository userRepository;
 
-    // 1. Tell Spring how to find a user in our PostgreSQL database
+    // Tell Spring how to find a user in our PostgreSQL database
     @Bean
     public UserDetailsService userDetailsService() {
         // Why: Spring Security's loadUserByUsername method defaults to looking for a "username".
@@ -30,7 +30,7 @@ public class ApplicationConfig {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
     }
 
-    // 2. Define the Authentication Engine
+    // Define the Authentication Engine
     @Bean
     public AuthenticationProvider authenticationProvider() {
 
@@ -40,7 +40,7 @@ public class ApplicationConfig {
         return authProvider;
     }
 
-    // 3. Define the Password Hashing Strategy
+    // Define the Password Hashing Strategy
     @Bean
     public PasswordEncoder passwordEncoder() {
         // Why: Production-grade apps NEVER store raw passwords in a database. 
@@ -48,10 +48,10 @@ public class ApplicationConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // 4. The Master Coordinator for Authentication
+    // The Master Coordinator for Authentication
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        // Why: This is the manager bean that your login controller will call later 
+        // This is the manager bean that your login controller will call later 
         // to actually process username/password authentication requests.
         return config.getAuthenticationManager();
     }
