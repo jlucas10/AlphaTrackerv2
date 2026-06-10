@@ -20,23 +20,23 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    
+
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService; // Core Spring interface to load user-specific data
 
     @Override
     protected void doFilterInternal(
-        @NonNull HttpServletRequest request,
-        @NonNull HttpServletResponse response,
-        @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
-        
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
+
         // Extract the Authorization header from the request
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
 
-        // If the header is missing or doesn't start with "Bearer ", pass it to the next filter. 
+        // If the header is missing or doesn't start with "Bearer ", pass it to the next
+        // filter.
         // It might be a public endpoint like /register or /login.
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -45,30 +45,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Extract the actual token (skipping "Bearer " which is 7 characters)
         jwt = authHeader.substring(7);
-        
+
         userEmail = jwtService.extractUsername(jwt);
 
-        // If we found an email, and the user isn't *already* authenticated in this current security context
+        // If we found an email, and the user isn't *already* authenticated in this
+        // current security context
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            
+
             // Fetch the user from the database to make sure they actually exist
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
             // Use JwtService to check if the token matches the user and isn't expired
             if (jwtService.isTokenValid(jwt, userDetails)) {
-                
+
                 // Spring Security uses this specific object to represent an authenticated user
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
-                        userDetails.getAuthorities()
-                );
-                
+                        userDetails.getAuthorities());
+
                 // Enrich the token with details of the web request (IP, session ID, etc.)
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                
-                // Update the Security Context. This is crucial. 
-                // Once this is set, Spring knows the user is logged in for the rest of this request's lifecycle.
+
+                // Update the Security Context. This is crucial.
+                // Once this is set, Spring knows the user is logged in for the rest of this
+                // request's lifecycle.
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
