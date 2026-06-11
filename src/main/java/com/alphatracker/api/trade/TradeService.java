@@ -8,12 +8,14 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class TradeService {
-    
+
     // Tradeservice handles business logic for trade
-    // Log trade, get trade for user, by id, and delete trade (keeping it simple for now)
+    // Log trade, get trade for user, get trade by id, and delete trade (keeping it
+    // simple for now)
     private final TradeRepository tradeRepository;
-    
-    // Saves a new trade entry to the database, explicitly linking it to the authenticated user.
+
+    // Saves a new trade entry to the database, explicitly linking it to the
+    // authenticated user.
     public Trade logTrade(Trade trade, User authenticatedUser) {
         trade.setUser(authenticatedUser); // Force the relationship boundary
         return tradeRepository.save(trade);
@@ -24,16 +26,17 @@ public class TradeService {
         return tradeRepository.findByUserId(authenticatedUser.getId());
     }
 
-    // Fetches a single trade but verifies the requester actually owns it before handing it over.
+    // Fetches a single trade but verifies the requester actually owns it before
+    // handing it over.
     public Trade getTradeById(Long tradeId, User authenticatedUser) {
         Trade trade = tradeRepository.findById(tradeId)
                 .orElseThrow(() -> new IllegalArgumentException("Trade execution not found with ID: " + tradeId));
-        
+
         // Data Boundary Check: Is another user trying to peek at this trade?
         if (!trade.getUser().getId().equals(authenticatedUser.getId())) {
             throw new SecurityException("Unauthorized access: You do not own this trade entry.");
         }
-        
+
         return trade;
     }
 
