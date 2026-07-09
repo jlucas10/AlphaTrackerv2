@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AuthView from './pages/AuthView';
 
 // Temporary Mock Components for the Views (We will build the actual beautiful layouts next!)
 const LoginMock = () => (
@@ -25,7 +26,7 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           {/* Public Route: Anyone can see this screen */}
-          <Route path="/login" element={<LoginMock />} />
+          <Route path="/login" element={<AuthView />} />
 
           {/* Protected Route: Wrapped inside our security gatekeeper */}
           <Route 
