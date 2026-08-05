@@ -1,14 +1,20 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTrades } from '../hooks/useTrades';
+import { computeAvgWinLoss, computeWinRate } from '../utils/pnlAggregations';
+import CalendarMatrix from '../components/dashboard/CalendarMatrix';
+import EquityCurveChart from '../components/dashboard/EquityCurveChart';
 
 const DashboardView: React.FC = () => {
   const { logout } = useAuth();
+  const { trades, loading, error } = useTrades();
 
-  // Mock data placeholders mirroring your premium screenshot layout
+  // TODO Sprint 2: replace with real Account/discipline data once the Account entity exists
   const disciplineScore = 94;
   const availableCapital = 0;
-  const winRate = 0;
-  const totalTrades = 0;
+
+  const { winRate, totalTrades } = computeWinRate(trades);
+  const { avgWin, avgLoss } = computeAvgWinLoss(trades);
 
   return (
     <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
@@ -62,7 +68,19 @@ const DashboardView: React.FC = () => {
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <main className="flex-1 overflow-y-auto p-8 space-y-6">
-        
+
+        {loading && (
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-sm text-gray-400 font-semibold">
+            Loading trades...
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="bg-red-50 p-4 rounded-2xl border border-red-100 shadow-sm text-sm text-red-500 font-semibold">
+            Failed to load trades: {error}
+          </div>
+        )}
+
         {/* TOP ROW: Active Account Banner */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
           <div className="flex gap-10">
@@ -97,38 +115,24 @@ const DashboardView: React.FC = () => {
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-64">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg Win</p>
-              <p className="text-2xl font-black text-emerald-500 mt-1">$0</p>
+              <p className="text-2xl font-black text-emerald-500 mt-1">${avgWin.toFixed(0)}</p>
             </div>
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg Loss</p>
-              <p className="text-2xl font-black text-red-500 mt-1">-$0</p>
+              <p className="text-2xl font-black text-red-500 mt-1">-${Math.abs(avgLoss).toFixed(0)}</p>
             </div>
           </div>
 
-          {/* Equity Curve Placeholder Card */}
+          {/* Equity Curve Card */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between h-64">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Equity Curve</p>
-            <div className="flex-1 flex items-center justify-center border-b border-dashed border-gray-200 mb-6">
-              <span className="text-xs text-gray-300 font-medium">No performance data compiled</span>
-            </div>
+            <EquityCurveChart trades={trades} />
           </div>
 
         </div>
 
         {/* BOTTOM ROW: Calendar Matrix Container */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm min-h-[300px]">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-4">
-              <button className="text-gray-400 hover:text-black font-bold">◀</button>
-              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">June 2026</h3>
-              <button className="text-gray-400 hover:text-black font-bold">▶</button>
-            </div>
-            <p className="text-xs font-bold text-emerald-500 uppercase tracking-wider">Monthly P/L: $0</p>
-          </div>
-          <div className="text-center py-12 text-sm text-gray-300 font-medium border border-dashed border-gray-100 rounded-xl">
-            Calendar system render block placeholder...
-          </div>
-        </div>
+        <CalendarMatrix trades={trades} />
 
       </main>
     </div>
