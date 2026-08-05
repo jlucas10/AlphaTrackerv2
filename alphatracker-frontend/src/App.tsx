@@ -22,7 +22,7 @@ import DashboardView from './pages/DashboardView';
 
 const App: React.FC = () => {
   return (
-    // 1. Provide global authentication state to all routes
+    // Provide global authentication state to all routes
     <AuthProvider>
       <Router>
         <Routes>

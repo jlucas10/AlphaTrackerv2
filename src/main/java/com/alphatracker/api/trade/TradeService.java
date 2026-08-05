@@ -1,5 +1,6 @@
 package com.alphatracker.api.trade;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import com.alphatracker.api.user.User;
@@ -14,11 +15,80 @@ public class TradeService {
     // simple for now)
     private final TradeRepository tradeRepository;
 
-    // Saves a new trade entry to the database, explicitly linking it to the
+    // Builds a trade from the trader's raw inputs and saves it against the
     // authenticated user.
-    public Trade logTrade(Trade trade, User authenticatedUser) {
-        trade.setUser(authenticatedUser); // Force the relationship boundary
+    //
+    // The trader supplies only what they observed: contract, direction, entry,
+    // exit, size. Everything monetary is derived here so that the dollar value
+    // of a point lives in exactly one place (Instrument) instead of being
+    // retyped per trade or duplicated in the frontend.
+    public Trade logTrade(TradeRequest request, User authenticatedUser) {
+        Instrument instrument = Instrument.fromTicker(request.getTicker());
+        String direction = normalizeDirection(request.getDirection());
+
+        double entryPrice = requirePrice(request.getEntryPrice(), "Entry price");
+        double exitPrice = requirePrice(request.getExitPrice(), "Exit price");
+        int contracts = requireContracts(request.getContracts());
+
+        // A short profits when price falls, so the sign of the move flips.
+        double priceMove = "LONG".equals(direction)
+                ? exitPrice - entryPrice
+                : entryPrice - exitPrice;
+
+        double gross = priceMove * instrument.getPointValue() * contracts;
+        double commission = instrument.getRoundTurnFee() * contracts;
+
+        Trade trade = Trade.builder()
+                .ticker(instrument.name())
+                .direction(direction)
+                .entryPrice(entryPrice)
+                .exitPrice(exitPrice)
+                .contracts(contracts)
+                .commission(round(commission))
+                .profitLoss(round(gross - commission)) // net is what hits the account
+                .followedPlan(request.getFollowedPlan() == null || request.getFollowedPlan())
+                .notes(request.getNotes())
+                .tradeDate(request.getTradeDate() == null ? LocalDateTime.now() : request.getTradeDate())
+                .user(authenticatedUser) // Force the relationship boundary
+                .build();
+
         return tradeRepository.save(trade);
+    }
+
+    private String normalizeDirection(String direction) {
+        if (direction == null || direction.isBlank()) {
+            throw new IllegalArgumentException("Direction is required.");
+        }
+        String normalized = direction.trim().toUpperCase();
+        if (!normalized.equals("LONG") && !normalized.equals("SHORT")) {
+            throw new IllegalArgumentException("Direction must be LONG or SHORT, got '" + direction.trim() + "'.");
+        }
+        return normalized;
+    }
+
+    private double requirePrice(Double price, String fieldName) {
+        if (price == null) {
+            throw new IllegalArgumentException(fieldName + " is required.");
+        }
+        if (price <= 0) {
+            throw new IllegalArgumentException(fieldName + " must be greater than zero.");
+        }
+        return price;
+    }
+
+    private int requireContracts(Integer contracts) {
+        if (contracts == null) {
+            throw new IllegalArgumentException("Contract count is required.");
+        }
+        if (contracts < 1) {
+            throw new IllegalArgumentException("Contract count must be at least 1.");
+        }
+        return contracts;
+    }
+
+    // Keeps stored dollars clean; raw double math yields values like 39.99999999.
+    private double round(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 
     // Extracts all trades belonging exclusively to the logged-in user's ID.

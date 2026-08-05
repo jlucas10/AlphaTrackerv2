@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTrades } from '../hooks/useTrades';
+import { TradeEntryModal } from '../components/TradeEntryModal';
 import { computeAvgWinLoss, computeWinRate } from '../utils/pnlAggregations';
 import CalendarMatrix from '../components/dashboard/CalendarMatrix';
 import EquityCurveChart from '../components/dashboard/EquityCurveChart';
 
 const DashboardView: React.FC = () => {
   const { logout } = useAuth();
-  const { trades, loading, error } = useTrades();
+  const { trades, loading, error, refetch } = useTrades();
+
+  // State for Trade Entry Modal
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // TODO Sprint 2: replace with real Account/discipline data once the Account entity exists
   const disciplineScore = 94;
@@ -93,9 +97,19 @@ const DashboardView: React.FC = () => {
               <p className="text-2xl font-black text-emerald-500 mt-0.5">{disciplineScore}%</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-3xl font-black text-gray-900">${availableCapital}</p>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-0.5">Available Capital</p>
+
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl transition-all shadow-sm"
+            >
+              + Log Trade
+            </button>
+
+            <div className="text-right">
+              <p className="text-3xl font-black text-gray-900">${availableCapital}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-0.5">Available Capital</p>
+            </div>
           </div>
         </div>
 
@@ -133,6 +147,15 @@ const DashboardView: React.FC = () => {
 
         {/* BOTTOM ROW: Calendar Matrix Container */}
         <CalendarMatrix trades={trades} />
+
+        {/* TRADE ENTRY MODAL */}
+        <TradeEntryModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onTradeAdded={() => {
+            if (refetch) refetch();
+          }}
+        />
 
       </main>
     </div>
