@@ -16,7 +16,7 @@ apiClient.interceptors.request.use(
 
         // if token exists, inject directly into authorization header
         if (token) {
-            config.headers.Authorization = 'Bearer ${token}';
+            config.headers.Authorization = `Bearer ${token}`;
         }
 
         return config;
