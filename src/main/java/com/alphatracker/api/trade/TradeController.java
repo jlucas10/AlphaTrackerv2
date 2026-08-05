@@ -25,11 +25,14 @@ public class TradeController {
     // inside the
     // SecurityContextHolder, extracts the logged-in User, and injects it straight
     // into our method.
+    // Takes a TradeRequest rather than the Trade entity: the request body can no
+    // longer carry an id (which save() would treat as an update to an existing
+    // row) and cannot set profitLoss, which the service derives instead.
     @PostMapping
     public ResponseEntity<Trade> createTrade(
-            @RequestBody Trade trade,
+            @RequestBody TradeRequest request,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(tradeService.logTrade(trade, user));
+        return ResponseEntity.ok(tradeService.logTrade(request, user));
     }
 
     // Get All Trades for the Current User
