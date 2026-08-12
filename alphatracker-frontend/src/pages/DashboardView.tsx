@@ -8,7 +8,7 @@ import EquityCurveChart from '../components/dashboard/EquityCurveChart';
 
 const DashboardView: React.FC = () => {
   const { logout } = useAuth();
-  const { trades, loading, error, refetch } = useTrades();
+  const { trades, loading, refreshing, error, refetch } = useTrades();
 
   // State for Trade Entry Modal
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -76,6 +76,14 @@ const DashboardView: React.FC = () => {
         {loading && (
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-sm text-gray-400 font-semibold">
             Loading trades...
+          </div>
+        )}
+
+        {/* Background refetch after logging a trade: the numbers below stay on
+            screen and update in place rather than collapsing into a loader. */}
+        {refreshing && (
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            Updating...
           </div>
         )}
 
@@ -152,9 +160,7 @@ const DashboardView: React.FC = () => {
         <TradeEntryModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          onTradeAdded={() => {
-            if (refetch) refetch();
-          }}
+          onTradeAdded={refetch}
         />
 
       </main>
