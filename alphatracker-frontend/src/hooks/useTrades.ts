@@ -1,43 +1,72 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import apiClient from '../api/apiClient';
 import type { Trade } from '../types/Trade';
 
 interface UseTradesResult {
   trades: Trade[];
-  loading: boolean;
+  loading: boolean;    // true only for the very first fetch
+  refreshing: boolean; // true for background refetches, so the dashboard never blanks
   error: string | null;
+  refetch: () => Promise<void>;
+}
+
+// Prefers the backend's JSON message (GlobalExceptionHandler returns { message }),
+// then falls back to Axios's own transport-level message.
+function extractMessage(err: unknown): string {
+  const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
+  return axiosErr?.response?.data?.message ?? axiosErr?.message ?? 'Failed to load trades';
 }
 
 export function useTrades(): UseTradesResult {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const isMountedRef = useRef(true);
+  // Monotonic id: only the newest in-flight request may write state, so a slow
+  // earlier refetch can never overwrite fresher data.
+  const requestIdRef = useRef(0);
+  const hasLoadedRef = useRef(false);
 
-    apiClient
-      .get<Trade[]>('/trades')
-      .then((res) => {
-        if (!cancelled) {
-          setTrades(res.data);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err.message ?? 'Failed to load trades');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+  const load = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isFirstLoad = !hasLoadedRef.current;
 
-    return () => {
-      cancelled = true;
-    };
+    if (isFirstLoad) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+    // Clear any previous failure, otherwise one transient error sticks forever.
+    setError(null);
+
+    try {
+      const res = await apiClient.get<Trade[]>('/trades');
+      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+      setTrades(res.data);
+      hasLoadedRef.current = true;
+    } catch (err) {
+      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+      setError(extractMessage(err));
+    } finally {
+      if (isMountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, []);
 
-  return { trades, loading, error };
+  useEffect(() => {
+    // Re-arm on mount: StrictMode's double-mount runs the cleanup below once,
+    // and the hook would otherwise stay permanently flagged as unmounted.
+    isMountedRef.current = true;
+    load();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [load]);
+
+  return { trades, loading, refreshing, error, refetch: load };
 }
