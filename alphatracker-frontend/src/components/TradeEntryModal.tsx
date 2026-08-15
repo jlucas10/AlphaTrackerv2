@@ -1,31 +1,69 @@
 import React, { useState } from "react";
 import apiClient from '../api/apiClient';
 
-// Define imports and component interface 
+// Define imports and component interface
 interface TradeEntryModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onTradeAdded: () => void;
+    // Returns a promise when the parent refetches, so submit can await it.
+    onTradeAdded: () => void | Promise<void>;
+}
+
+// Mirrors the backend Instrument enum. Presented as a dropdown rather than a
+// free-text field so an unsupported ticker is impossible to submit — the server
+// rejects unknown tickers outright, and this keeps that error off the screen.
+const INSTRUMENTS = [
+    'ES', 'MES', 'NQ', 'MNQ', 'YM', 'MYM', 'RTY', 'M2K', 'CL', 'MCL', 'GC', 'MGC',
+] as const;
+
+// datetime-local wants "YYYY-MM-DDTHH:mm" in LOCAL time. toISOString() would
+// convert to UTC and could file a late-evening trade under the following day on
+// the calendar matrix, so the local parts are formatted by hand.
+function nowForInput(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // Initialize form and UI state
-export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
+export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     isOpen,
     onClose,
     onTradeAdded,
 }) => {
-    // Form state fields aligned with your backend Trade entity
-    const [symbol, setSymbol] = useState<string>('MNQ');
+    // Form state fields aligned with the backend TradeRequest DTO.
+    // Commission is deliberately absent: the server derives it from the ticker's
+    // round-turn fee, so there is nothing here for the trader to mistype.
+    const [ticker, setTicker] = useState<string>('MNQ');
     const [direction, setDirection] = useState<'LONG' | 'SHORT'>('LONG');
     const [entryPrice, setEntryPrice] = useState<string>('');
     const [exitPrice, setExitPrice] = useState<string>('');
-    const [quantity, setQuantity] = useState<string>('1');
-    const [commission, setCommission] = useState<string>('1.30');
+    const [contracts, setContracts] = useState<string>('1');
+    const [tradeDate, setTradeDate] = useState<string>(nowForInput);
     const [followedPlan, setFollowedPlan] = useState<boolean>(true);
     const [notes, setNotes] = useState<string>('');
-    
+
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+
+    // The modal stays mounted while closed (the early return below renders null),
+    // so state has to be cleared explicitly or the next open shows stale values.
+    const resetForm = () => {
+        setTicker('MNQ');
+        setDirection('LONG');
+        setEntryPrice('');
+        setExitPrice('');
+        setContracts('1');
+        setTradeDate(nowForInput());
+        setFollowedPlan(true);
+        setNotes('');
+        setError('');
+    };
+
+    const handleClose = () => {
+        resetForm();
+        onClose();
+    };
 
     if (!isOpen) return null;
 
@@ -34,22 +72,29 @@ export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
     setError('');
     setLoading(true);
 
+    // Keys match TradeRequest exactly. No commission and no profitLoss: both are
+    // derived server-side from the instrument's point value and round-turn fee.
     const payload = {
-      symbol,
+      ticker,
       direction,
       entryPrice: parseFloat(entryPrice),
       exitPrice: parseFloat(exitPrice),
-      quantity: parseInt(quantity, 10),
-      commission: parseFloat(commission),
+      contracts: parseInt(contracts, 10),
       followedPlan,
       notes,
+      // "2026-08-14T09:30" — Jackson parses this straight into LocalDateTime.
+      tradeDate,
     };
 
     try {
       await apiClient.post('/trades', payload);
+      // Await the parent's refetch so the calendar and equity curve already show
+      // this trade by the time the modal disappears, rather than briefly showing
+      // stale totals.
+      await onTradeAdded();
       setLoading(false);
-      onTradeAdded(); // Refetch live trades in the parent view
-      onClose();      // Close modal on success
+      resetForm();
+      onClose();
     } catch (err: any) {
       console.error(err);
       setLoading(false);
@@ -65,7 +110,7 @@ export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <h3 className="text-lg font-bold text-white">Log Execution</h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
             className="text-slate-400 hover:text-white font-bold text-xl transition-colors"
           >
@@ -86,14 +131,17 @@ export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
               <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
                 Instrument
               </label>
-              <input
-                type="text"
-                required
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                placeholder="MNQ, NQ, ES..."
+              <select
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
                 className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
-              />
+              >
+                {INSTRUMENTS.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -144,7 +192,7 @@ export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
             </div>
           </div>
 
-          {/* Contracts & Commissions */}
+          {/* Contracts & Timestamp */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
@@ -154,21 +202,25 @@ export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
                 type="number"
                 min="1"
                 required
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                value={contracts}
+                onChange={(e) => setContracts(e.target.value)}
                 className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
               />
             </div>
 
+            {/* Commissions used to live here. The server now derives them from the
+                instrument, so this slot holds the trade timestamp instead — the
+                calendar matrix needs a real date to file the trade under, and
+                backfilling yesterday's session is impossible without it. */}
             <div>
               <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
-                Commissions ($)
+                Date & Time
               </label>
               <input
-                type="number"
-                step="any"
-                value={commission}
-                onChange={(e) => setCommission(e.target.value)}
+                type="datetime-local"
+                required
+                value={tradeDate}
+                onChange={(e) => setTradeDate(e.target.value)}
                 className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
               />
             </div>
@@ -205,7 +257,7 @@ export const TradeEntryModalProps: React.FC<TradeEntryModalProps> = ({
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-colors"
             >
               Cancel
