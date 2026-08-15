@@ -1,7 +1,6 @@
 package com.alphatracker.api.auth;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,7 +11,8 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/v1/auth") // Matches the .permitAll() pattern we declared in SecurityConfiguration
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+// CORS is configured globally in SecurityConfiguration; the per-controller
+// @CrossOrigin was removed so auth and trades share one policy.
 public class AuthenticationController {
 
     private final AuthenticationService service;
