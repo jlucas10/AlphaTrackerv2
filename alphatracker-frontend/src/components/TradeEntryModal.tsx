@@ -104,22 +104,26 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     }
   };
 
+  // Backdrop and panel match DayDetailModal so both dialogs read as the same
+  // surface as the dashboard cards behind them.
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl text-slate-100">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <h3 className="text-lg font-bold text-white">Log Execution</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white border border-gray-100 p-6 shadow-2xl text-gray-800">
+        <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+          <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+            Log Execution
+          </h3>
           <button
             onClick={handleClose}
             type="button"
-            className="text-slate-400 hover:text-white font-bold text-xl transition-colors"
+            className="text-gray-300 hover:text-gray-900 font-bold text-xl transition-colors"
           >
             ✕
           </button>
         </div>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-950/50 border border-red-800 text-red-300 text-xs rounded-lg font-semibold">
+          <div className="mt-4 p-3 bg-red-50 border border-red-100 text-red-600 text-xs rounded-lg font-semibold">
             {error}
           </div>
         )}
@@ -128,13 +132,13 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
           {/* Ticker & Direction */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
                 Instrument
               </label>
               <select
                 value={ticker}
                 onChange={(e) => setTicker(e.target.value)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black"
               >
                 {INSTRUMENTS.map((code) => (
                   <option key={code} value={code}>
@@ -145,13 +149,13 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
                 Direction
               </label>
               <select
                 value={direction}
                 onChange={(e) => setDirection(e.target.value as 'LONG' | 'SHORT')}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black"
               >
                 <option value="LONG">LONG 📈</option>
                 <option value="SHORT">SHORT 📉</option>
@@ -162,7 +166,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
           {/* Entry & Exit Prices */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
                 Entry Price
               </label>
               <input
@@ -172,12 +176,12 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
                 placeholder="20150.25"
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
                 Exit Price
               </label>
               <input
@@ -187,7 +191,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                 value={exitPrice}
                 onChange={(e) => setExitPrice(e.target.value)}
                 placeholder="20185.00"
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black"
               />
             </div>
           </div>
@@ -195,7 +199,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
           {/* Contracts & Timestamp */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
                 Contract Size
               </label>
               <input
@@ -204,7 +208,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                 required
                 value={contracts}
                 onChange={(e) => setContracts(e.target.value)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black"
               />
             </div>
 
@@ -213,7 +217,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                 calendar matrix needs a real date to file the trade under, and
                 backfilling yesterday's session is impossible without it. */}
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+              <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
                 Date & Time
               </label>
               <input
@@ -221,7 +225,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                 required
                 value={tradeDate}
                 onChange={(e) => setTradeDate(e.target.value)}
-                className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600"
+                className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black"
               />
             </div>
           </div>
@@ -233,16 +237,16 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
               id="followedPlan"
               checked={followedPlan}
               onChange={(e) => setFollowedPlan(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-800 bg-slate-950 text-emerald-500 focus:ring-0"
+              className="h-4 w-4 rounded border-gray-300 bg-gray-50 text-emerald-600 focus:ring-0"
             />
-            <label htmlFor="followedPlan" className="text-xs font-semibold text-slate-300">
+            <label htmlFor="followedPlan" className="text-xs font-semibold text-gray-600">
               Followed Trading Rules & Risk Plan
             </label>
           </div>
 
           {/* Trade Notes */}
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
+            <label className="block text-xs font-bold uppercase text-gray-600 mb-1">
               Execution Notes / Setup Details
             </label>
             <textarea
@@ -250,18 +254,19 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Key levels, catalyst, entry strategy..."
-              className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-slate-600 resize-none"
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-black resize-none"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-colors"
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition-colors"
             >
               Cancel
             </button>
+            {/* Emerald primary matches the "+ Log Trade" button that opens this dialog. */}
             <button
               type="submit"
               disabled={loading}
