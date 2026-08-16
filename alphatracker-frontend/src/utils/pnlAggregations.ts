@@ -21,6 +21,28 @@ export function getPnlForDay(dayTotals: Map<string, number>, day: Date): number 
   return dayTotals.get(format(day, DAY_KEY_FORMAT)) ?? 0;
 }
 
+// Companion to groupTradesByDay. That function sums each day down to a single
+// number, which is all the calendar colouring needs but discards the trades
+// themselves — so a day cell had no way to show what produced its total.
+// This keeps the underlying executions, keyed identically so both maps agree.
+export function groupTradeListsByDay(trades: Trade[]): Map<string, Trade[]> {
+  const dayTrades = new Map<string, Trade[]>();
+  for (const trade of trades) {
+    const key = format(parseISO(trade.tradeDate), DAY_KEY_FORMAT);
+    const existing = dayTrades.get(key);
+    if (existing) {
+      existing.push(trade);
+    } else {
+      dayTrades.set(key, [trade]);
+    }
+  }
+  return dayTrades;
+}
+
+export function getTradesForDay(dayTrades: Map<string, Trade[]>, day: Date): Trade[] {
+  return dayTrades.get(format(day, DAY_KEY_FORMAT)) ?? [];
+}
+
 export function getMonthlyTotal(dayTotals: Map<string, number>, monthDate: Date): number {
   const monthPrefix = format(monthDate, 'yyyy-MM');
   let total = 0;

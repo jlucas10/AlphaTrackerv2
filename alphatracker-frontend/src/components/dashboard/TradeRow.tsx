@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { Trade } from '../../types/Trade';
-
-// Shared money formatter so the table, the day modal and the day totals all
-// render dollars identically.
-export function formatUsd(value: number): string {
-  const sign = value >= 0 ? '+' : '-';
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
-}
+import { formatUsd } from '../../utils/formatters';
 
 interface TradeRowProps {
   trade: Trade;
