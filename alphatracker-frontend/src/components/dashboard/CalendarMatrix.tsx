@@ -11,19 +11,33 @@ import {
   subMonths,
 } from 'date-fns';
 import type { Trade } from '../../types/Trade';
-import { getMonthlyTotal, getPnlForDay, groupTradesByDay } from '../../utils/pnlAggregations';
+import {
+  getMonthlyTotal,
+  getPnlForDay,
+  getTradesForDay,
+  groupTradeListsByDay,
+  groupTradesByDay,
+} from '../../utils/pnlAggregations';
 import CalendarDayCell from './CalendarDayCell';
+import DayDetailModal from './DayDetailModal';
 
 interface CalendarMatrixProps {
   trades: Trade[];
+  onDeleteTrade: (id: number) => Promise<void>;
 }
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const CalendarMatrix: React.FC<CalendarMatrixProps> = ({ trades }) => {
+const CalendarMatrix: React.FC<CalendarMatrixProps> = ({ trades, onDeleteTrade }) => {
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   const dayTotals = useMemo(() => groupTradesByDay(trades), [trades]);
+  const dayTrades = useMemo(() => groupTradeListsByDay(trades), [trades]);
+
+  // Derived from `trades` rather than held in state, so deleting the last trade
+  // of a day updates this list instead of leaving the modal showing a stale row.
+  const selectedTrades = selectedDay ? getTradesForDay(dayTrades, selectedDay) : [];
 
   const days = useMemo(() => {
     const gridStart = startOfWeek(startOfMonth(visibleMonth));
@@ -77,9 +91,22 @@ const CalendarMatrix: React.FC<CalendarMatrixProps> = ({ trades }) => {
             day={day}
             pnl={getPnlForDay(dayTotals, day)}
             inCurrentMonth={isSameMonth(day, visibleMonth)}
+            tradeCount={getTradesForDay(dayTrades, day).length}
+            onSelect={setSelectedDay}
           />
         ))}
       </div>
+
+      {/* Close automatically once the day is empty, otherwise deleting the last
+          trade would leave an empty dialog open. */}
+      {selectedDay && selectedTrades.length > 0 && (
+        <DayDetailModal
+          day={selectedDay}
+          trades={selectedTrades}
+          onClose={() => setSelectedDay(null)}
+          onDelete={onDeleteTrade}
+        />
+      )}
     </div>
   );
 };

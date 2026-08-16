@@ -5,10 +5,12 @@ import { TradeEntryModal } from '../components/TradeEntryModal';
 import { computeAvgWinLoss, computeWinRate } from '../utils/pnlAggregations';
 import CalendarMatrix from '../components/dashboard/CalendarMatrix';
 import EquityCurveChart from '../components/dashboard/EquityCurveChart';
+import WinRateRing from '../components/dashboard/WinRateRing';
+import TradeTable from '../components/dashboard/TradeTable';
 
 const DashboardView: React.FC = () => {
   const { logout } = useAuth();
-  const { trades, loading, refreshing, error, refetch } = useTrades();
+  const { trades, loading, refreshing, error, refetch, deleteTrade } = useTrades();
 
   // State for Trade Entry Modal
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -152,7 +154,10 @@ const DashboardView: React.FC = () => {
         </div>
 
         {/* BOTTOM ROW: Calendar Matrix Container */}
-        <CalendarMatrix trades={trades} />
+        <CalendarMatrix trades={trades} onDeleteTrade={deleteTrade} />
+
+        {/* Trade Execution Table */}
+        <TradeTable trades={trades} onDelete={deleteTrade} />
 
         {/* TRADE ENTRY MODAL */}
         <TradeEntryModal
