@@ -96,14 +96,21 @@ blowing the trailing drawdown is what actually ends a prop account.
   equity peak, or static?
 - Existing trades have no account — backfill to a "Default" account, or nullable FK?
 
-## Sprint 3 — Journal & Analytics
+## Sprint 3 — Journal, Media & Deep Analytics
 
-- [ ] Real Discipline Score (unblocked today — `followedPlan` is already stored per trade)
+**Journal View & Media Attachments**
+- [ ] Journal view implementation (wire up `/journal` sidebar route)
+- [ ] AWS S3 image storage integration for chart screenshots (Entry, Exit, HTF Context)
+- [ ] `TradeAttachment` entity (`id`, `trade_id`, `s3_url`, `attachment_type`, `caption`)
+- [ ] Drag-and-drop / Clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
+- [ ] Structured trade reflection notes (Setup Model, HTF Bias, Liquidity Target, Execution Rating)
+
+**Analytics & Rule Tracking**
+- [ ] Real Discipline Score (unblocked — derived from `followedPlan` across trades)
 - [ ] Per-instrument breakdown (P/L by MNQ vs NQ vs ES)
-- [ ] Time-of-day / session analysis (full timestamps already stored)
-- [ ] R-multiple & expectancy (requires a stop-loss field on trades)
+- [ ] Time-of-day / session analysis (London vs NY AM vs PM session based on stored timestamps)
+- [ ] R-multiple & expectancy tracking (add optional `stopLoss` field to `TradeRequest` / `Trade`)
 - [ ] Streaks + peak-to-trough drawdown curve
-- [ ] Journal view (sidebar link exists but routes nowhere)
 
 ## Backlog
 
