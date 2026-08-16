@@ -127,9 +127,7 @@ const DashboardView: React.FC = () => {
           {/* Win Rate Ring Card */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-between h-64 text-center">
             <p className="w-full text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Win Rate %</p>
-            <div className="relative w-32 h-32 flex items-center justify-center rounded-full border-8 border-red-100">
-              <span className="text-2xl font-black text-gray-900">{winRate}%</span>
-            </div>
+            <WinRateRing winRate={winRate} totalTrades={totalTrades} />
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Trades: {totalTrades}</p>
           </div>
 

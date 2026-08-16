@@ -8,6 +8,7 @@ interface UseTradesResult {
   refreshing: boolean; // true for background refetches, so the dashboard never blanks
   error: string | null;
   refetch: () => Promise<void>;
+  deleteTrade: (id: number) => Promise<void>;
 }
 
 // Prefers the backend's JSON message (GlobalExceptionHandler returns { message }),
@@ -57,6 +58,24 @@ export function useTrades(): UseTradesResult {
     }
   }, []);
 
+  // Deleting lives here rather than in the table so every /trades call shares the
+  // same refetch and error handling. The server re-checks ownership, so a failure
+  // here is surfaced rather than swallowed.
+  const deleteTrade = useCallback(
+    async (id: number) => {
+      try {
+        await apiClient.delete(`/trades/${id}`);
+      } catch (err) {
+        if (isMountedRef.current) {
+          setError(extractMessage(err));
+        }
+        throw err; // let the caller clear its own pending state
+      }
+      await load();
+    },
+    [load],
+  );
+
   useEffect(() => {
     // Re-arm on mount: StrictMode's double-mount runs the cleanup below once,
     // and the hook would otherwise stay permanently flagged as unmounted.
@@ -68,5 +87,5 @@ export function useTrades(): UseTradesResult {
     };
   }, [load]);
 
-  return { trades, loading, refreshing, error, refetch: load };
+  return { trades, loading, refreshing, error, refetch: load, deleteTrade };
 }
