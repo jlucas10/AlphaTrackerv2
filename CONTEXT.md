@@ -76,34 +76,75 @@ selected" banner, and Evaluation vs. Funded filtering.
 
 **Backend**
 
-- [ ] `Account` entity: label, firm, type (`EVALUATION` / `FUNDED`), starting balance, profit target, max drawdown
+- [ ] Unit tests for `Instrument` + `logTrade` — do this FIRST, before Account work touches `logTrade`
+- [ ] `Account` entity: label, firm, type (`EVALUATION` / `FUNDED`), starting balance,
+      profit target, max drawdown, `drawdownMode`, `isPrimary`
 - [ ] `user_id` FK on Account; `account_id` FK on Trade
-- [ ] `GET /api/v1/accounts`, account-scoped trade queries
-- [ ] Unit tests for `Instrument` + `logTrade` — do this BEFORE Account work touches `logTrade`
+- [ ] `GET /api/v1/accounts`, `POST /api/v1/accounts`, account-scoped trade queries
+- [ ] Drawdown calculation service (see rules below)
+- [ ] Backfill migration: create a primary account and assign existing trades to it
 
 **Frontend**
 
+- [ ] **Drawdown tracker** — distance to the drawdown floor
 - [ ] Account filter dropdown; scope calendar, curve, stats, and table to the selection
 - [ ] Real available capital
-- [ ] **Drawdown tracker** — distance to the trailing drawdown limit
+- [ ] Set/change primary account
 
 **Priority note:** build drawdown tracking before the dropdown. The filter is convenience;
 blowing the trailing drawdown is what actually ends a prop account.
 
-**Open decisions**
+### Decision: drawdown rules (resolved)
 
-- Which firm's drawdown rules to model: trailing on closed balance, trailing on intraday
-  equity peak, or static?
-- Existing trades have no account — backfill to a "Default" account, or nullable FK?
+**Trailing on closed balance.** The floor follows the account's high-water mark and never
+moves down:
+
+```
+closedBalance   = startingBalance + Σ profitLoss        (net, as already stored)
+highWaterMark   = max(closedBalance) over account history
+drawdownFloor   = highWaterMark - maxDrawdown
+cushion         = closedBalance - drawdownFloor          ← the number that matters
+```
+
+`drawdownMode` is a per-account enum because "closed balance" is ambiguous and firms differ:
+
+- `END_OF_DAY` — the high-water mark only updates at session close (more forgiving)
+- `PER_TRADE_CLOSE` — updates as each trade closes, so an intraday peak can raise the floor
+
+Default to `END_OF_DAY`; both are computable from data already stored.
+
+**Optional `trailingStopsAtBalance`** — many firms freeze the floor once it reaches a
+threshold (often the starting balance), after which it stops trailing entirely. Nullable;
+when set, `drawdownFloor = min(highWaterMark - maxDrawdown, trailingStopsAtBalance)`.
+
+**Not modelled:** intraday *equity* peak (unrealized). That would require capturing MAE/MFE
+per trade, which is not currently recorded.
+
+### Decision: account backfill (resolved)
+
+- `Account.isPrimary` boolean; exactly one primary per user, changeable from the UI.
+- On migration: create one account, mark it primary, assign all existing trades to it.
+- `Trade.account_id` starts **nullable** (`ddl-auto: update` cannot add NOT NULL to a
+  populated table), backfilled immediately, and treated as required in application code.
+- New trades default to the primary account when the request omits one.
 
 ## Sprint 3 — Journal & Analytics
 
-- [ ] Real Discipline Score (unblocked today — `followedPlan` is already stored per trade)
+**Journal View & Media Attachments**
+
+- [ ] Journal view implementation (wire up `/journal` sidebar route)
+- [ ] AWS S3 image storage integration for chart screenshots (Entry, Exit, HTF Context)
+- [ ] `TradeAttachment` entity (`id`, `trade_id`, `s3_url`, `attachment_type`, `caption`)
+- [ ] Drag-and-drop / Clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
+- [ ] Structured trade reflection notes (Setup Model, HTF Bias, Liquidity Target, Execution Rating)
+
+**Analytics & Rule Tracking**
+
+- [ ] Real Discipline Score (unblocked — derived from `followedPlan` across trades)
 - [ ] Per-instrument breakdown (P/L by MNQ vs NQ vs ES)
-- [ ] Time-of-day / session analysis (full timestamps already stored)
-- [ ] R-multiple & expectancy (requires a stop-loss field on trades)
+- [ ] Time-of-day / session analysis (London vs NY AM vs PM session based on stored timestamps)
+- [ ] R-multiple & expectancy tracking (add optional `stopLoss` field to `TradeRequest` / `Trade`)
 - [ ] Streaks + peak-to-trough drawdown curve
-- [ ] Journal view (sidebar link exists but routes nowhere)
 
 ## Backlog
 
