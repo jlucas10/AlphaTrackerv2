@@ -128,13 +128,67 @@ per trade, which is not currently recorded.
   populated table), backfilled immediately, and treated as required in application code.
 - New trades default to the primary account when the request omits one.
 
-## Sprint 3 — Journal & Analytics
+## Sprint 3a — Journal View & Media Attachments
 
-- [ ] Real Discipline Score (unblocked today — `followedPlan` is already stored per trade)
+- [ ] Journal view implementation (wire up `/journal` sidebar route)
+- [ ] `StorageService` interface + **local filesystem** implementation
+- [ ] `TradeAttachment` entity (`id`, `trade_id`, `storageKey`, `attachmentType`, `caption`)
+- [ ] Attachment upload / serve endpoints with ownership checks
+- [ ] Drag-and-drop / clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
+- [ ] Structured trade reflection fields (see below)
+- [ ] AWS S3 `StorageService` implementation — only when deploying
+
+### Attachment design notes
+
+- **Store `storageKey`, never a URL.** A public bucket for trade screenshots is not
+  acceptable, so reads use presigned URLs — and those expire in minutes. Persist the key
+  (`trades/42/entry-a1b2c3.png`) and generate a fresh URL per read.
+- **`StorageService` abstraction first, S3 later.** The app runs on localhost today;
+  local-filesystem storage delivers the whole feature with no AWS SDK, IAM credentials,
+  bucket policy, or cost on the critical path. `TradeAttachment` is unchanged when the S3
+  adapter lands — only the adapter differs.
+- **Ownership check on every read.** Serving an attachment must verify the parent trade
+  belongs to the requester, following the pattern in `TradeService.getTradeById`. Without it,
+  anyone holding a URL reads another user's charts.
+- **`attachmentType` is an enum** (`ENTRY`, `EXIT`, `HTF_CONTEXT`) — a typo'd string silently
+  creates a category that never renders.
+- Validate file type and max size on upload; screenshots are pasted, so expect PNG.
+
+### Structured reflection fields
+
+Free-text notes cannot be aggregated — "what's my win rate on this setup?" needs enumerated
+data. Build these BEFORE the analytics that consume them.
+
+- **HTF Bias** — enum (`BULLISH` / `BEARISH` / `NEUTRAL`)
+- **Execution Rating** — int 1–5
+- **Setup Model** — a user-managed tag entity, NOT a Java enum. The vocabulary will evolve,
+  and an enum means a code change and redeploy per new setup.
+- **Liquidity Target** — free text initially; promote to tags if patterns emerge.
+- **Overlap warning:** Execution Rating and `followedPlan` measure adjacent things. Keep
+  `followedPlan` as the binary rule-adherence flag feeding the Discipline Score; treat the
+  rating as separate execution-quality data. They must not silently feed the same number.
+
+## Sprint 3b — Analytics & Rule Tracking
+
+- [ ] Real Discipline Score (derived from `followedPlan` across trades)
 - [ ] Per-instrument breakdown (P/L by MNQ vs NQ vs ES)
-- [ ] Time-of-day / session analysis (London vs NY AM vs PM session based on stored timestamps)
-- [ ] R-multiple & expectancy tracking (add optional `stopLoss` field to `TradeRequest` / `Trade`)
+- [ ] Time-of-day / session analysis (London vs NY AM vs PM)
+- [ ] R-multiple & expectancy tracking
 - [ ] Streaks + peak-to-trough drawdown curve
+- [ ] Win rate colouring by expectancy rather than the current flat 50% threshold
+
+### Analytics design notes
+
+- **R-multiple needs the PLANNED stop, set at entry** — not where the trade actually exited,
+  or R becomes circular. Add optional `stopLoss` to `Trade` / `TradeRequest`:
+  `riskDollars = |entry - stopLoss| × pointValue × contracts`, then `R = profitLoss / riskDollars`.
+  Consider a planned `target` too: it is the only way to measure cutting winners early, which
+  is usually the more expensive habit.
+- **Timezone landmine — settle before collecting months of data.** `Trade.tradeDate` is a
+  `LocalDateTime` with NO zone. Sessions are defined in exchange time, so bucketing a zoneless
+  timestamp only works while logging from one machine in one timezone, and breaks silently
+  across DST. Decide: standardize on `America/New_York`, or store the zone alongside the
+  timestamp. Retrofitting sessions onto ambiguous timestamps means never trusting the buckets.
 
 ## Backlog
 
