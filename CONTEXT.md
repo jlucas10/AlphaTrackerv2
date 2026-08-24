@@ -117,7 +117,7 @@ Default to `END_OF_DAY`; both are computable from data already stored.
 threshold (often the starting balance), after which it stops trailing entirely. Nullable;
 when set, `drawdownFloor = min(highWaterMark - maxDrawdown, trailingStopsAtBalance)`.
 
-**Not modelled:** intraday *equity* peak (unrealized). That would require capturing MAE/MFE
+**Not modelled:** intraday _equity_ peak (unrealized). That would require capturing MAE/MFE
 per trade, which is not currently recorded.
 
 ### Decision: account backfill (resolved)
@@ -130,17 +130,7 @@ per trade, which is not currently recorded.
 
 ## Sprint 3 — Journal & Analytics
 
-**Journal View & Media Attachments**
-
-- [ ] Journal view implementation (wire up `/journal` sidebar route)
-- [ ] AWS S3 image storage integration for chart screenshots (Entry, Exit, HTF Context)
-- [ ] `TradeAttachment` entity (`id`, `trade_id`, `s3_url`, `attachment_type`, `caption`)
-- [ ] Drag-and-drop / Clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
-- [ ] Structured trade reflection notes (Setup Model, HTF Bias, Liquidity Target, Execution Rating)
-
-**Analytics & Rule Tracking**
-
-- [ ] Real Discipline Score (unblocked — derived from `followedPlan` across trades)
+- [ ] Real Discipline Score (unblocked today — `followedPlan` is already stored per trade)
 - [ ] Per-instrument breakdown (P/L by MNQ vs NQ vs ES)
 - [ ] Time-of-day / session analysis (London vs NY AM vs PM session based on stored timestamps)
 - [ ] R-multiple & expectancy tracking (add optional `stopLoss` field to `TradeRequest` / `Trade`)
