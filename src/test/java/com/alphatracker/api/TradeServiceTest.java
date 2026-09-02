@@ -106,4 +106,21 @@ public class TradeServiceTest {
         verify(tradeRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when contract count is less than 1")
+    void testInvalidContractsThrowsException() {
+        TradeRequest request = new TradeRequest();
+        request.setTicker("MNQ");
+        request.setDirection("LONG");
+        request.setEntryPrice(20000.0);
+        request.setExitPrice(20010.0);
+        request.setContracts(0);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            tradeService.logTrade(request, mockUser);
+        });
+
+        verify(tradeRepository, never()).save(any());
+    }
+
 }
