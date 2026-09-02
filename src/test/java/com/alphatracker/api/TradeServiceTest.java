@@ -65,4 +65,25 @@ public class TradeServiceTest {
         assertTrue(savedTrade.getFollowedPlan());
         assertNotNull(savedTrade.getTradeDate());
     }
+
+    @Test
+    @DisplayName("Should correctly invert direction and multiply contracts for an NQ Short execution")
+    void TestShortMultiContractCalculation() {
+        TradeRequest request = new TradeRequest();
+        request.setTicker("NQ");
+        request.setDirection("Short");
+        request.setEntryPrice(20200.00);
+        request.setExitPrice(20150.00);
+        request.setContracts(2);
+
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Pass mockUser
+        Trade savedTrade = tradeService.logTrade(request, mockUser);
+
+        assertNotNull(savedTrade);
+        assertEquals(1991.44, savedTrade.getProfitLoss(), 0.001);
+        assertEquals(8.56, savedTrade.getCommission(), 0.001);
+        assertEquals("NQ", savedTrade.getTicker());
+    }
 }
