@@ -71,7 +71,7 @@ public class TradeServiceTest {
     void TestShortMultiContractCalculation() {
         TradeRequest request = new TradeRequest();
         request.setTicker("NQ");
-        request.setDirection("Short");
+        request.setDirection("SHORT");
         request.setEntryPrice(20200.00);
         request.setExitPrice(20150.00);
         request.setContracts(2);
@@ -86,4 +86,24 @@ public class TradeServiceTest {
         assertEquals(8.56, savedTrade.getCommission(), 0.001);
         assertEquals("NQ", savedTrade.getTicker());
     }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException when an unrecognized ticker is provided")
+    void TestUnknownTickerException() {
+        TradeRequest request = new TradeRequest();
+        request.setTicker("AAPL");
+        request.setDirection("LONG");
+        request.setEntryPrice(150.00);
+        request.setExitPrice(155.00);
+        request.setContracts(1);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            tradeService.logTrade(request, mockUser);
+        });
+
+        assertTrue(exception.getMessage().toLowerCase().contains("unknown")
+                || exception.getMessage().toLowerCase().contains("unsupported"));
+        verify(tradeRepository, never()).save(any());
+    }
+
 }
