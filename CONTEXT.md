@@ -76,7 +76,7 @@ selected" banner, and Evaluation vs. Funded filtering.
 
 **Backend**
 
-- [ ] Unit tests for `Instrument` + `logTrade` — do this FIRST, before Account work touches `logTrade`
+- [x] Unit tests for `Instrument` + `logTrade` — do this FIRST, before Account work touches `logTrade`
 - [ ] `Account` entity: label, firm, type (`EVALUATION` / `FUNDED`), starting balance,
       profit target, max drawdown, `drawdownMode`, `isPrimary`
 - [ ] `user_id` FK on Account; `account_id` FK on Trade
