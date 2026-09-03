@@ -22,12 +22,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TradeRequest {
 
-    private String ticker;        // ES, NQ, MNQ, MES... resolved via Instrument
-    private String direction;     // LONG or SHORT
+    private String ticker; // ES, NQ, MNQ, MES... resolved via Instrument
+    private String direction; // LONG or SHORT
     private Double entryPrice;
     private Double exitPrice;
-    private Integer contracts;    // number of lots: 1, 2, 3...
+    private Integer contracts; // number of lots: 1, 2, 3...
     private Boolean followedPlan; // discipline flag for the journal
     private String notes;
     private LocalDateTime tradeDate; // optional; defaults to now if omitted
+    private Long accountId;
 }
