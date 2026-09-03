@@ -2,10 +2,13 @@ package com.alphatracker.api.trade;
 
 import java.time.LocalDateTime;
 
+import com.alphatracker.api.account.Account;
 import com.alphatracker.api.user.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -19,7 +22,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "trade")
-@Data 
+@Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -30,20 +33,20 @@ public class Trade {
     private Long id;
 
     @Column(nullable = false)
-    private String ticker; //Ticker: ES, MES, NQ, MNQ
-    
+    private String ticker; // Ticker: ES, MES, NQ, MNQ
+
     @Column(nullable = false)
     private String direction; // Long or Short
-    
+
     @Column(nullable = false)
     private Double entryPrice;
-    
+
     @Column(nullable = false)
     private Double exitPrice;
-    
+
     @Column(nullable = false)
-    private Integer contracts; // num of lots 
-    
+    private Integer contracts; // num of lots
+
     @Column(nullable = false)
     private Double profitLoss; // Net PNL: gross move minus commission
 
@@ -63,10 +66,15 @@ public class Trade {
     @Column(nullable = false)
     private LocalDateTime tradeDate;
 
-    // Establishes the One-to-Many mapping. 
+    // Establishes the One-to-Many mapping.
     // Tells JPA to link this trade row back to a specific User's primary key
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = true)
+    @JsonIgnore
+    private Account account;
 
 }
