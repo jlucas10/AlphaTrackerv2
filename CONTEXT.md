@@ -77,12 +77,13 @@ selected" banner, and Evaluation vs. Funded filtering.
 **Backend**
 
 - [x] Unit tests for `Instrument` + `logTrade` — do this FIRST, before Account work touches `logTrade`
-- [ ] `Account` entity: label, firm, type (`EVALUATION` / `FUNDED`), starting balance,
+- [x] `Account` entity: label, firm, type (`EVALUATION` / `FUNDED`), starting balance,
       profit target, max drawdown, `drawdownMode`, `isPrimary`
-- [ ] `user_id` FK on Account; `account_id` FK on Trade
-- [ ] `GET /api/v1/accounts`, `POST /api/v1/accounts`, account-scoped trade queries
-- [ ] Drawdown calculation service (see rules below)
-- [ ] Backfill migration: create a primary account and assign existing trades to it
+- [x] `user_id` FK on Account; `account_id` FK on Trade
+- [x] `GET /api/v1/accounts`, `POST /api/v1/accounts`, account-scoped trade queries
+- [x] Drawdown calculation service (see rules below)
+- [x] Account-scoped trade queries — `GET /api/v1/trades?accountId={id}` integrated into `TradeController`
+      and `TradeService`
 
 **Frontend**
 
