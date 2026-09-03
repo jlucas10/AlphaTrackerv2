@@ -35,13 +35,14 @@ public class TradeController {
         return ResponseEntity.ok(tradeService.logTrade(request, user));
     }
 
-    // Get All Trades for the Current User
-    // Handles GET requests to /api/v1/trades. Returns only the trades belonging to
-    // the active token.
+    // Handles GET requests to /api/v1/trades
+    // Supports fetching all trades or filtering by account:
+    // /api/v1/trades?accountId=1
     @GetMapping
-    public ResponseEntity<List<Trade>> getAllTrades(
-            @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(tradeService.getTradesForUser(user));
+    public ResponseEntity<List<Trade>> getTrades(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) Long accountId) {
+        return ResponseEntity.ok(tradeService.getTradesForUser(user, accountId));
     }
 
     // Handles GET requests to /api/v1/trades/{id} (ex, /api/v1/trades/5)

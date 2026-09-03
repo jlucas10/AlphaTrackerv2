@@ -3,6 +3,10 @@ package com.alphatracker.api.trade;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.alphatracker.api.account.Account;
+import com.alphatracker.api.account.AccountRepository;
 import com.alphatracker.api.user.User;
 import lombok.RequiredArgsConstructor;
 
@@ -14,6 +18,7 @@ public class TradeService {
     // Log trade, get trade for user, get trade by id, and delete trade (keeping it
     // simple for now)
     private final TradeRepository tradeRepository;
+    private final AccountRepository accountRepository;
 
     // Builds a trade from the trader's raw inputs and saves it against the
     // authenticated user.
@@ -37,7 +42,18 @@ public class TradeService {
 
         double gross = priceMove * instrument.getPointValue() * contracts;
         double commission = instrument.getRoundTurnFee() * contracts;
+        double netProfitLoss = round(gross - commission);
 
+        // Sprint 2: Link to Account if accountId is passed
+        Account targetAccount = null;
+        if (request.getAccountId() != null) {
+            targetAccount = accountRepository.findByIdAndUserId(request.getAccountId(), authenticatedUser.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Account not found or does not belong to user."));
+
+            // Sync account live balance
+            targetAccount.setCurrentBalance(round(targetAccount.getCurrentBalance() + netProfitLoss));
+            accountRepository.save(targetAccount);
+        }
         Trade trade = Trade.builder()
                 .ticker(instrument.name())
                 .direction(direction)
@@ -45,11 +61,12 @@ public class TradeService {
                 .exitPrice(exitPrice)
                 .contracts(contracts)
                 .commission(round(commission))
-                .profitLoss(round(gross - commission)) // net is what hits the account
+                .profitLoss(netProfitLoss) // net is what hits the account
                 .followedPlan(request.getFollowedPlan() == null || request.getFollowedPlan())
                 .notes(request.getNotes())
                 .tradeDate(request.getTradeDate() == null ? LocalDateTime.now() : request.getTradeDate())
                 .user(authenticatedUser) // Force the relationship boundary
+                .account(targetAccount) // Links trade to account
                 .build();
 
         return tradeRepository.save(trade);
@@ -91,13 +108,19 @@ public class TradeService {
         return Math.round(value * 100.0) / 100.0;
     }
 
-    // Extracts all trades belonging exclusively to the logged-in user's ID.
-    public List<Trade> getTradesForUser(User authenticatedUser) {
+    // Supports fetching all trades for user
+    @Transactional(readOnly = true)
+    public List<Trade> getTradesForUser(User authenticatedUser, Long accountId) {
+        if (accountId != null) {
+            return tradeRepository.findAllByUserIdAndAccountIdOrderByTradeDateDesc(authenticatedUser.getId(),
+                    accountId);
+        }
         return tradeRepository.findByUserId(authenticatedUser.getId());
     }
 
     // Fetches a single trade but verifies the requester actually owns it before
     // handing it over.
+    @Transactional(readOnly = true)
     public Trade getTradeById(Long tradeId, User authenticatedUser) {
         Trade trade = tradeRepository.findById(tradeId)
                 .orElseThrow(() -> new IllegalArgumentException("Trade execution not found with ID: " + tradeId));
@@ -112,7 +135,14 @@ public class TradeService {
 
     // Deletes a trade entry after validating ownership boundaries.
     public void deleteTrade(Long tradeId, User authenticatedUser) {
-        Trade trade = getTradeById(tradeId, authenticatedUser); // Reuses our validation logic above
+        Trade trade = getTradeById(tradeId, authenticatedUser);
+
+        if (trade.getAccount() != null) {
+            Account account = trade.getAccount();
+            account.setCurrentBalance(round(account.getCurrentBalance() - trade.getProfitLoss()));
+            accountRepository.save(account);
+        }
+
         tradeRepository.delete(trade);
     }
 }
