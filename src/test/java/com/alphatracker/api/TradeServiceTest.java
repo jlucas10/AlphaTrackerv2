@@ -212,4 +212,26 @@ public class TradeServiceTest {
         verify(accountRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("Should filter trades by account ID when provided")
+    void testGetTradesScopedToAccount() {
+        Long accountId = 10L;
+
+        tradeService.getTradesForUser(mockUser, accountId);
+
+        verify(tradeRepository, times(1))
+                .findAllByUserIdAndAccountIdOrderByTradeDateDesc(mockUser.getId(), accountId);
+        verify(tradeRepository, never()).findByUserId(any());
+    }
+
+    @Test
+    @DisplayName("Should fetch all trades for user when account ID is null")
+    void testGetTradesUnscopedWhenAccountIdIsNull() {
+        tradeService.getTradesForUser(mockUser, null);
+
+        verify(tradeRepository, times(1)).findByUserId(mockUser.getId());
+        verify(tradeRepository, never())
+                .findAllByUserIdAndAccountIdOrderByTradeDateDesc(any(), any());
+    }
+
 }
