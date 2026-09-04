@@ -29,4 +29,28 @@ export const useAccount = () => {
     }, [selectedAccountId]);
 
     // next is createAccount and selecting an account
-}
+    const createAccount = async(payload: CreateAccountPayload): Promise<Account> => {
+        const response = await apiClient.post<Account>('/accounts', payload);
+        const newAccount = response.data;
+        setAccounts((prev) => [...prev, newAccount]);
+        setSelectedAccountId(newAccount.id);
+        return newAccount;
+    };
+    
+    useEffect(() => {
+        fetchAccounts();
+    }, []);
+
+    const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || null;
+
+    return {
+        accounts,
+        selectedAccountId,
+        setSelectedAccountId,
+        selectedAccount,
+        loading,
+        error,
+        refetchAccounts: fetchAccounts,
+        createAccount,
+    };
+};
