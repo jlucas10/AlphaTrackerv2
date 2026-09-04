@@ -156,4 +156,37 @@ public class TradeServiceTest {
         verify(tradeRepository, times(1)).delete(mockTrade);
     }
 
+    @Test
+    @DisplayName("Should link trade to account and update live account balance")
+    void testLogTradeWithAccountSync() {
+        // Arrange
+        Account mockAccount = Account.builder()
+                .id(5L)
+                .startingBalance(50000.00)
+                .currentBalance(50000.00)
+                .user(mockUser)
+                .build();
+
+        TradeRequest request = TradeRequest.builder()
+                .ticker("MNQ")
+                .direction("LONG")
+                .entryPrice(20150.25)
+                .exitPrice(20185.00) // Net P/L = $68.16
+                .contracts(1)
+                .accountId(5L)
+                .build();
+
+        when(accountRepository.findByIdAndUserId(5L, mockUser.getId())).thenReturn(Optional.of(mockAccount));
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Trade result = tradeService.logTrade(request, mockUser);
+
+        // Assert
+        assertNotNull(result.getAccount());
+        assertEquals(5L, result.getAccount().getId());
+        assertEquals(50068.16, mockAccount.getCurrentBalance(), 0.01);
+        verify(accountRepository, times(1)).save(mockAccount);
+    }
+
 }
