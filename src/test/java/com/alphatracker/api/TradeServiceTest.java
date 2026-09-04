@@ -189,4 +189,27 @@ public class TradeServiceTest {
         verify(accountRepository, times(1)).save(mockAccount);
     }
 
+    @Test
+    @DisplayName("Should throw SecurityException when deleting a trade owned by another user")
+    void testDeleteTradeUnauthorizedThrowsException() {
+        User otherUser = new User();
+        otherUser.setId(2L);
+        otherUser.setEmail("intruder@example.com");
+
+        Trade otherUserTrade = Trade.builder()
+                .id(101L)
+                .profitLoss(250.00)
+                .user(otherUser)
+                .build();
+
+        when(tradeRepository.findById(101L)).thenReturn(Optional.of(otherUserTrade));
+
+        assertThrows(SecurityException.class, () -> {
+            tradeService.deleteTrade(101L, mockUser);
+        });
+
+        verify(tradeRepository, never()).delete(any());
+        verify(accountRepository, never()).save(any());
+    }
+
 }
