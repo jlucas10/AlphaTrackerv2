@@ -1,5 +1,7 @@
 package com.alphatracker.api;
 
+import com.alphatracker.api.account.Account;
+import com.alphatracker.api.account.AccountRepository;
 import com.alphatracker.api.trade.Trade;
 import com.alphatracker.api.trade.TradeRepository;
 import com.alphatracker.api.trade.TradeRequest;
@@ -29,6 +31,9 @@ public class TradeServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private AccountRepository accountRepository;
 
     @InjectMocks
     private TradeService tradeService;
@@ -121,6 +126,34 @@ public class TradeServiceTest {
         });
 
         verify(tradeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should delete trade and reverse its P/L on the linked account balance")
+    void testDeleteTradeReversesAccountBalance() {
+        // Arrange
+        Account mockAccount = Account.builder()
+                .id(10L)
+                .currentBalance(50100.00)
+                .user(mockUser)
+                .build();
+
+        Trade mockTrade = Trade.builder()
+                .id(99L)
+                .profitLoss(100.00)
+                .user(mockUser)
+                .account(mockAccount)
+                .build();
+
+        when(tradeRepository.findById(99L)).thenReturn(Optional.of(mockTrade));
+
+        // Act
+        tradeService.deleteTrade(99L, mockUser);
+
+        // Assert
+        assertEquals(50000.00, mockAccount.getCurrentBalance(), 0.01);
+        verify(accountRepository, times(1)).save(mockAccount);
+        verify(tradeRepository, times(1)).delete(mockTrade);
     }
 
 }
