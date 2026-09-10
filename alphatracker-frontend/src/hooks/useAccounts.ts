@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../api/apiClient";
-import { Account, CreateAccountPayload } from "../types/Account"
+import type{ Account, CreateAccountPayload } from "../types/Account"
 
 export const useAccount = () => {
     const [accounts, setAccounts] = useState<Account[]>([]);
