@@ -18,7 +18,7 @@ function extractMessage(err: unknown): string {
   return axiosErr?.response?.data?.message ?? axiosErr?.message ?? 'Failed to load trades';
 }
 
-export function useTrades(): UseTradesResult {
+export function useTrades(accountId?: number | null): UseTradesResult {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,7 +43,10 @@ export function useTrades(): UseTradesResult {
     setError(null);
 
     try {
-      const res = await apiClient.get<Trade[]>('/trades');
+      // pass accountId as a query param if one is selected 
+      const params = accountId ? { accountId } : {};
+      const res = await apiClient.get<Trade[]>('/trades', { params });
+
       if (!isMountedRef.current || requestId !== requestIdRef.current) return;
       setTrades(res.data);
       hasLoadedRef.current = true;
@@ -56,7 +59,7 @@ export function useTrades(): UseTradesResult {
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [accountId]);
 
   // Deleting lives here rather than in the table so every /trades call shares the
   // same refetch and error handling. The server re-checks ownership, so a failure
