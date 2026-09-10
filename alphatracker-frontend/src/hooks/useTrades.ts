@@ -18,7 +18,7 @@ function extractMessage(err: unknown): string {
   return axiosErr?.response?.data?.message ?? axiosErr?.message ?? 'Failed to load trades';
 }
 
-export function useTrades(): UseTradesResult {
+export function useTrades(accountId?: number | null): UseTradesResult {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
