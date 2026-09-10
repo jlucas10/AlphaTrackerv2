@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import apiClient from '../api/apiClient';
+import type { Account } from '../types/Account';
 
 // Define imports and component interface
 interface TradeEntryModalProps {
@@ -7,6 +8,9 @@ interface TradeEntryModalProps {
     onClose: () => void;
     // Returns a promise when the parent refetches, so submit can await it.
     onTradeAdded: () => void | Promise<void>;
+    accounts?: Account[];
+    defaultAccountId?: number | null;
+
 }
 
 // Mirrors the backend Instrument enum. Presented as a dropdown rather than a
@@ -15,6 +19,7 @@ interface TradeEntryModalProps {
 const INSTRUMENTS = [
     'ES', 'MES', 'NQ', 'MNQ', 'YM', 'MYM', 'RTY', 'M2K', 'CL', 'MCL', 'GC', 'MGC',
 ] as const;
+
 
 // datetime-local wants "YYYY-MM-DDTHH:mm" in LOCAL time. toISOString() would
 // convert to UTC and could file a late-evening trade under the following day on
@@ -30,8 +35,13 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     isOpen,
     onClose,
     onTradeAdded,
+    accounts = [],
+    defaultAccountId = null,
 }) => {
     // Form state fields aligned with the backend TradeRequest DTO.
+    const [accountId, setAccountId] = useState<number | undefined>(
+      defaultAccountId ?? (accounts.length > 0 ? accounts[0].id : undefined)
+    );
     // Commission is deliberately absent: the server derives it from the ticker's
     // round-turn fee, so there is nothing here for the trader to mistype.
     const [ticker, setTicker] = useState<string>('MNQ');
@@ -49,6 +59,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     // The modal stays mounted while closed (the early return below renders null),
     // so state has to be cleared explicitly or the next open shows stale values.
     const resetForm = () => {
+        setAccountId(defaultAccountId ?? (accounts.length > 0 ? accounts[0].id : undefined));
         setTicker('MNQ');
         setDirection('LONG');
         setEntryPrice('');
@@ -82,8 +93,9 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
       contracts: parseInt(contracts, 10),
       followedPlan,
       notes,
-      // "2026-08-14T09:30" — Jackson parses this straight into LocalDateTime.
+      // "2026-08-14T09:30" — parses this straight into LocalDateTime.
       tradeDate,
+      accountId: accountId || undefined, // Attach accountId to execution
     };
 
     try {
