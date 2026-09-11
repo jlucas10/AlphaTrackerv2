@@ -196,10 +196,8 @@ const DashboardView: React.FC = () => {
         {/* BOTTOM ROW: Calendar Matrix Container */}
         <CalendarMatrix trades={trades} onDeleteTrade={deleteTrade} />
 
-        {/* Trade Execution Table */}
         <TradeTable trades={trades} onDelete={deleteTrade} />
 
-        {/* TRADE ENTRY MODAL */}
         <TradeEntryModal
           isOpen={isTradeModalOpen}
           onClose={() => setIsTradeModalOpen(false)}
@@ -211,7 +209,6 @@ const DashboardView: React.FC = () => {
           defaultAccountId={selectedAccountId}
         />
 
-        {/* CREATE ACCOUNT MODAL */}
         <CreateAccountModal
           isOpen={isCreateAccountOpen}
           onClose={() => setIsCreateAccountOpen(false)}
