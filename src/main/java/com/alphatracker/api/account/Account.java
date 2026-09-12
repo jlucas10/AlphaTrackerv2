@@ -44,6 +44,18 @@ public class Account {
     @Column(nullable = false)
     private Double maxDrawdown; // 2,000
 
+    // Nullable, like commission on Trade: ddl-auto=update cannot add a NOT NULL
+    // column to a table that already holds rows. Null is treated as END_OF_DAY
+    // everywhere this is read.
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private DrawdownMode drawdownMode = DrawdownMode.END_OF_DAY;
+
+    // Once the high-water mark minus maxDrawdown would exceed this balance, the
+    // floor stops trailing upward and locks here. Null means the floor trails
+    // indefinitely with no lock-in point.
+    private Double trailingStopsAtBalance;
+
     @Builder.Default
     private Boolean active = true;
 

@@ -17,4 +17,6 @@ public class AccountRequest {
     private Double startingBalance;
     private Double profitTarget;
     private Double maxDrawdown;
+    private DrawdownMode drawdownMode;
+    private Double trailingStopsAtBalance;
 }
