@@ -23,7 +23,7 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
               const val = e.target.value;
               onSelectAccount(val === '' ? null : Number(val));
             }}
-            className="bg-neutral-900 border border-neutral-800 text-neutral-200 text-xs font-mono rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer appearance-none"
+            className="bg-gray-50 border border-gray-200 text-gray-900 text-xs font-bold rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-black transition-colors cursor-pointer appearance-none"
           >
             <option value="">All Accounts (Aggregated)</option>
             {accounts.map((acc) => (
@@ -32,7 +32,7 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
               </option>
             ))}
           </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-neutral-400">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
@@ -43,7 +43,7 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
           <button
             type="button"
             onClick={onOpenCreateModal}
-            className="text-xs font-mono bg-neutral-900 hover:bg-neutral-800 text-neutral-300 px-2.5 py-2 rounded-lg border border-neutral-800 transition hover:border-neutral-700"
+            className="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-2 rounded-lg transition-colors"
             title="Add New Account"
           >
             + Account
