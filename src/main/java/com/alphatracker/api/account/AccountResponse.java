@@ -24,6 +24,7 @@ public class AccountResponse {
     private Double trailingStopsAtBalance;
     private Double highWaterMark;
     private Double drawdownFloor;
+    private Boolean isPrimary;
     private Boolean active;
     private LocalDateTime createdAt;
 
@@ -44,6 +45,7 @@ public class AccountResponse {
                 .trailingStopsAtBalance(account.getTrailingStopsAtBalance())
                 .highWaterMark(snapshot.highWaterMark())
                 .drawdownFloor(snapshot.drawdownFloor())
+                .isPrimary(Boolean.TRUE.equals(account.getIsPrimary()))
                 .active(account.getActive())
                 .createdAt(account.getCreatedAt())
                 .build();

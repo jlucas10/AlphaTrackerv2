@@ -37,6 +37,11 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
+            {account.isPrimary && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+                ★ Primary
+              </span>
+            )}
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
               {account.firm}
             </span>

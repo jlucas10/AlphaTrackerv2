@@ -17,4 +17,11 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     // Chronological order because the drawdown engine replays balance forward
     // in time to find the high-water mark.
     List<Trade> findAllByAccountIdOrderByTradeDateAsc(Long accountId);
+
+    // "Unassigned" trades: logged before the trader had a primary account, or
+    // logged without picking one. Used to preview and then execute a backfill
+    // onto whichever account becomes primary.
+    List<Trade> findAllByUserIdAndAccountIsNull(Long userId);
+
+    long countByUserIdAndAccountIsNull(Long userId);
 }

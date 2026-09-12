@@ -6,6 +6,7 @@ interface AccountSelectorProps {
     selectedAccountId: number | null;
     onSelectAccount: (accountId: number | null) => void;
     onOpenCreateModal?: () => void;
+    onSetPrimary?: (accountId: number) => void;
 }
 
 export const AccountSelector: React.FC<AccountSelectorProps> = ({
@@ -13,7 +14,9 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
     selectedAccountId,
     onSelectAccount,
     onOpenCreateModal,
+    onSetPrimary,
 }) => {
+    const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null;
     return (
       <div className="flex items-center gap-2">
         <div className="relative">
@@ -38,7 +41,23 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
             </svg>
           </div>
         </div>
-  
+
+        {onSetPrimary && selectedAccount && (
+          <button
+            type="button"
+            onClick={() => onSetPrimary(selectedAccount.id)}
+            disabled={selectedAccount.isPrimary}
+            title={selectedAccount.isPrimary ? 'This is your primary account' : 'Set as primary account'}
+            className={`text-xs font-bold px-2.5 py-2 rounded-lg transition-colors ${
+              selectedAccount.isPrimary
+                ? 'bg-emerald-50 text-emerald-600 cursor-default'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+            }`}
+          >
+            {selectedAccount.isPrimary ? '★ Primary' : '☆ Set Primary'}
+          </button>
+        )}
+
         {onOpenCreateModal && (
           <button
             type="button"
