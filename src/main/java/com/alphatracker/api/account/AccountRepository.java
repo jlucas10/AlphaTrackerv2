@@ -14,4 +14,8 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     // Find a specific account and ensure it belongs to the user
     Optional<Account> findByIdAndUserId(Long id, Long userId);
+
+    // Returned as a List rather than a single Account so setPrimaryAccount can
+    // self-heal if more than one row was ever left primary=true for a user.
+    List<Account> findAllByUserIdAndIsPrimaryTrue(Long userId);
 }

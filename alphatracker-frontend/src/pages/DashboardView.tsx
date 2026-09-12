@@ -4,6 +4,7 @@ import { useTrades } from '../hooks/useTrades';
 import { useAccount } from '../hooks/useAccounts';
 import { AccountSelector } from '../components/dashboard/AccountSelector';
 import { DrawdownGauge } from '../components/dashboard/DrawdownGauge';
+import { BackfillBanner } from '../components/dashboard/BackfillBanner';
 import { CreateAccountModal } from '../components/dashboard/CreateAccountModal';
 import { TradeEntryModal } from '../components/TradeEntryModal';
 import { computeAvgWinLoss, computeWinRate } from '../utils/pnlAggregations';
@@ -23,6 +24,9 @@ const DashboardView: React.FC = () => {
     selectedAccount,
     createAccount,
     refetchAccounts,
+    setPrimaryAccount,
+    unassignedTradeCount,
+    backfillUnassignedTrades,
   } = useAccount();
 
   // Trades Scoped to Active Account
@@ -46,6 +50,8 @@ const DashboardView: React.FC = () => {
 
   const { winRate, totalTrades } = computeWinRate(trades);
   const { avgWin, avgLoss } = computeAvgWinLoss(trades);
+
+  const primaryAccount = accounts.find((a) => a.isPrimary) ?? null;
 
   return (
     <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
@@ -131,6 +137,7 @@ const DashboardView: React.FC = () => {
                 selectedAccountId={selectedAccountId}
                 onSelectAccount={setSelectedAccountId}
                 onOpenCreateModal={() => setIsCreateAccountOpen(true)}
+                onSetPrimary={(accountId) => setPrimaryAccount(accountId)}
               />
             </div>
             <div className="border-l border-gray-100 pl-8">
@@ -161,6 +168,21 @@ const DashboardView: React.FC = () => {
         {/* Drawdown Risk Engine Gauge (Rendered when a prop account is selected) */}
         {selectedAccount && (
           <DrawdownGauge account={selectedAccount} />
+        )}
+
+        {/* Backfill banner: only meaningful once a primary account exists to
+            backfill onto, and only shown when there's actually something
+            unassigned to move. */}
+        {primaryAccount && (
+          <BackfillBanner
+            primaryAccount={primaryAccount}
+            unassignedTradeCount={unassignedTradeCount}
+            onBackfill={backfillUnassignedTrades}
+            onBackfilled={async () => {
+              await refetch();
+              await refetchAccounts();
+            }}
+          />
         )}
 
         {/* MIDDLE ROW: Performance Analytics Grid */}

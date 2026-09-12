@@ -56,6 +56,11 @@ public class Account {
     // indefinitely with no lock-in point.
     private Double trailingStopsAtBalance;
 
+    // Exactly one account per user should have this true at a time; enforced in
+    // AccountService.setPrimaryAccount, not at the schema level. Nullable for the
+    // same ddl-auto=update reason as drawdownMode above — null reads as false.
+    private Boolean isPrimary;
+
     @Builder.Default
     private Boolean active = true;
 

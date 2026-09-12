@@ -49,7 +49,18 @@ public class TradeService {
         if (request.getAccountId() != null) {
             targetAccount = accountRepository.findByIdAndUserId(request.getAccountId(), authenticatedUser.getId())
                     .orElseThrow(() -> new IllegalArgumentException("Account not found or does not belong to user."));
+        } else {
+            // No account chosen: fall back to the trader's primary account rather
+            // than leaving the trade permanently unassigned (invisible to every
+            // account's balance and drawdown gauge). A trader with no primary
+            // account set yet still gets the old unassigned behavior.
+            List<Account> primaryAccounts = accountRepository.findAllByUserIdAndIsPrimaryTrue(authenticatedUser.getId());
+            if (!primaryAccounts.isEmpty()) {
+                targetAccount = primaryAccounts.get(0);
+            }
+        }
 
+        if (targetAccount != null) {
             // Sync account live balance
             targetAccount.setCurrentBalance(round(targetAccount.getCurrentBalance() + netProfitLoss));
             accountRepository.save(targetAccount);

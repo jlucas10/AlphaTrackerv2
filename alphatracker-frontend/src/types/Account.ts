@@ -19,8 +19,17 @@ export interface Account {
     // account's full trade history — never recompute these on the client.
     highWaterMark: number;
     drawdownFloor: number;
+    // Exactly one account per user is primary at a time — see
+    // AccountService.setPrimaryAccount. New trades logged without an
+    // explicit account attach here instead of staying unassigned.
+    isPrimary: boolean;
     active: boolean;
     createdAt: string;
+}
+
+export interface BackfillResult {
+    tradesBackfilled: number;
+    account: Account;
 }
 
 export interface CreateAccountPayload {

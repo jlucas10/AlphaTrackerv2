@@ -28,4 +28,23 @@ public class AccountController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(accountService.createAccount(request, user));
     }
+
+    @PatchMapping("/{id}/primary")
+    public ResponseEntity<AccountResponse> setPrimaryAccount(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accountService.setPrimaryAccount(id, user));
+    }
+
+    // Preview endpoint the frontend calls before showing the backfill confirm
+    // step, so the trader sees how many trades would move before committing.
+    @GetMapping("/unassigned-trades/count")
+    public ResponseEntity<Long> getUnassignedTradeCount(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accountService.countUnassignedTrades(user));
+    }
+
+    @PostMapping("/backfill-unassigned")
+    public ResponseEntity<BackfillResult> backfillUnassignedTrades(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accountService.backfillUnassignedTrades(user));
+    }
 }

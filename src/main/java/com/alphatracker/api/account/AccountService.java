@@ -98,6 +98,12 @@ public class AccountService {
             throw new IllegalArgumentException("Trailing stop balance must be greater than 0.");
         }
 
+        // A brand new trader has nothing to choose from, so their very first
+        // account becomes primary automatically — otherwise new trades logged
+        // without picking an account would have nowhere to attach until the
+        // trader discovers the primary-account setting exists.
+        boolean isFirstAccount = accountRepository.findAllByUserId(user.getId()).isEmpty();
+
         Account account = Account.builder()
                 .name(request.getName().trim())
                 .firm(request.getFirm().trim())
@@ -108,11 +114,69 @@ public class AccountService {
                 .maxDrawdown(request.getMaxDrawdown())
                 .drawdownMode(request.getDrawdownMode() == null ? DrawdownMode.END_OF_DAY : request.getDrawdownMode())
                 .trailingStopsAtBalance(request.getTrailingStopsAtBalance())
+                .isPrimary(isFirstAccount)
                 .active(true)
                 .user(user)
                 .build();
 
         Account saved = accountRepository.save(account);
         return AccountResponse.fromEntity(saved, computeDrawdownSnapshot(saved));
+    }
+
+    // Marks one account primary and unsets any other, so exactly one account
+    // per user is ever primary. Reassigns nothing by itself — backfilling
+    // existing unassigned trades onto the new primary is a separate, explicit
+    // step (backfillUnassignedTrades) since it mutates historical balances.
+    @Transactional
+    public AccountResponse setPrimaryAccount(Long accountId, User user) {
+        Account target = accountRepository.findByIdAndUserId(accountId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or does not belong to user."));
+
+        List<Account> currentlyPrimary = accountRepository.findAllByUserIdAndIsPrimaryTrue(user.getId());
+        for (Account account : currentlyPrimary) {
+            if (!account.getId().equals(target.getId())) {
+                account.setIsPrimary(false);
+                accountRepository.save(account);
+            }
+        }
+
+        target.setIsPrimary(true);
+        Account saved = accountRepository.save(target);
+        return AccountResponse.fromEntity(saved, computeDrawdownSnapshot(saved));
+    }
+
+    // Preview count shown before the trader confirms a backfill.
+    @Transactional(readOnly = true)
+    public long countUnassignedTrades(User user) {
+        return tradeRepository.countByUserIdAndAccountIsNull(user.getId());
+    }
+
+    // Attaches every unassigned trade to the user's primary account and rolls
+    // its net P/L into that account's live balance. Requires a primary account
+    // to already be set — there's no implicit "pick one for me" fallback here,
+    // since that's exactly the ambiguity a primary account exists to resolve.
+    @Transactional
+    public BackfillResult backfillUnassignedTrades(User user) {
+        List<Account> primaryAccounts = accountRepository.findAllByUserIdAndIsPrimaryTrue(user.getId());
+        if (primaryAccounts.isEmpty()) {
+            throw new IllegalArgumentException("No primary account set. Set a primary account before backfilling.");
+        }
+        Account primary = primaryAccounts.get(0);
+
+        List<Trade> unassigned = tradeRepository.findAllByUserIdAndAccountIsNull(user.getId());
+        if (unassigned.isEmpty()) {
+            return new BackfillResult(0, AccountResponse.fromEntity(primary, computeDrawdownSnapshot(primary)));
+        }
+
+        double totalPnl = unassigned.stream().mapToDouble(Trade::getProfitLoss).sum();
+        for (Trade trade : unassigned) {
+            trade.setAccount(primary);
+        }
+        tradeRepository.saveAll(unassigned);
+
+        primary.setCurrentBalance(round(primary.getCurrentBalance() + totalPnl));
+        Account saved = accountRepository.save(primary);
+
+        return new BackfillResult(unassigned.size(), AccountResponse.fromEntity(saved, computeDrawdownSnapshot(saved)));
     }
 }

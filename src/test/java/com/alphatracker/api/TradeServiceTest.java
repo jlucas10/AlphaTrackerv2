@@ -17,6 +17,7 @@ import org.mockito.exceptions.base.MockitoException;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -232,6 +233,59 @@ public class TradeServiceTest {
         verify(tradeRepository, times(1)).findByUserId(mockUser.getId());
         verify(tradeRepository, never())
                 .findAllByUserIdAndAccountIdOrderByTradeDateDesc(any(), any());
+    }
+
+    @Test
+    @DisplayName("Should attach a trade to the primary account when no accountId is given")
+    void testLogTradeDefaultsToPrimaryAccountWhenAccountIdOmitted() {
+        Account primaryAccount = Account.builder()
+                .id(7L)
+                .currentBalance(50000.00)
+                .isPrimary(true)
+                .user(mockUser)
+                .build();
+
+        TradeRequest request = TradeRequest.builder()
+                .ticker("MNQ")
+                .direction("LONG")
+                .entryPrice(20150.25)
+                .exitPrice(20185.00) // Net P/L = $68.16
+                .contracts(1)
+                .build();
+
+        when(accountRepository.findAllByUserIdAndIsPrimaryTrue(mockUser.getId()))
+                .thenReturn(List.of(primaryAccount));
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Trade result = tradeService.logTrade(request, mockUser);
+
+        assertNotNull(result.getAccount());
+        assertEquals(7L, result.getAccount().getId());
+        assertEquals(50068.16, primaryAccount.getCurrentBalance(), 0.01);
+        verify(accountRepository, times(1)).save(primaryAccount);
+        // The trader never picked an account explicitly, so the ownership
+        // lookup used for an explicit accountId must not run.
+        verify(accountRepository, never()).findByIdAndUserId(any(), any());
+    }
+
+    @Test
+    @DisplayName("Should leave a trade unassigned when no accountId is given and no primary account exists")
+    void testLogTradeStaysUnassignedWithoutPrimaryAccount() {
+        TradeRequest request = TradeRequest.builder()
+                .ticker("MNQ")
+                .direction("LONG")
+                .entryPrice(20150.25)
+                .exitPrice(20185.00)
+                .contracts(1)
+                .build();
+
+        when(accountRepository.findAllByUserIdAndIsPrimaryTrue(mockUser.getId())).thenReturn(List.of());
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Trade result = tradeService.logTrade(request, mockUser);
+
+        assertNull(result.getAccount());
+        verify(accountRepository, never()).save(any());
     }
 
 }
