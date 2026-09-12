@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { AccountType, CreateAccountPayload } from '../../types/Account';
+import type { AccountType, CreateAccountPayload, DrawdownMode } from '../../types/Account';
 
 interface CreateAccountModalProps {
   isOpen: boolean;
@@ -18,6 +18,8 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   const [startingBalance, setStartingBalance] = useState('50000');
   const [maxDrawdown, setMaxDrawdown] = useState('2000');
   const [profitTarget, setProfitTarget] = useState('3000');
+  const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>('END_OF_DAY');
+  const [trailingStopsAtBalance, setTrailingStopsAtBalance] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +38,8 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         startingBalance: parseFloat(startingBalance),
         maxDrawdown: parseFloat(maxDrawdown),
         profitTarget: profitTarget ? parseFloat(profitTarget) : undefined,
+        drawdownMode,
+        trailingStopsAtBalance: trailingStopsAtBalance ? parseFloat(trailingStopsAtBalance) : undefined,
       });
       // Reset & close
       setName('');
@@ -139,6 +143,32 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
                 placeholder="Optional"
                 value={profitTarget}
                 onChange={(e) => setProfitTarget(e.target.value)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-200 font-mono focus:outline-hidden focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-mono text-neutral-400 mb-1">Drawdown Mode</label>
+              <select
+                value={drawdownMode}
+                onChange={(e) => setDrawdownMode(e.target.value as DrawdownMode)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-200 font-mono focus:outline-hidden focus:border-emerald-500"
+              >
+                <option value="END_OF_DAY">End of Day</option>
+                <option value="PER_TRADE_CLOSE">Per Trade Close</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-neutral-400 mb-1">Trailing Lock ($)</label>
+              <input
+                type="number"
+                step="any"
+                placeholder="Optional"
+                value={trailingStopsAtBalance}
+                onChange={(e) => setTrailingStopsAtBalance(e.target.value)}
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-200 font-mono focus:outline-hidden focus:border-emerald-500"
               />
             </div>

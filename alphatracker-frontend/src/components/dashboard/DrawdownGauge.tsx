@@ -20,9 +20,10 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
   const maxDd = account.maxDrawdown;
   const pnl = current - starting;
 
-  // Trailing limit moves up as account balance reaches new peaks
-  const peakBalance = Math.max(starting, current);
-  const drawdownFloor = peakBalance - maxDd;
+  // highWaterMark and drawdownFloor are computed server-side from the full
+  // trade history under the account's drawdownMode (END_OF_DAY vs
+  // PER_TRADE_CLOSE) and trailingStopsAtBalance — never re-derived here.
+  const drawdownFloor = account.drawdownFloor;
   const cushion = Math.max(0, current - drawdownFloor);
   const cushionPercent = Math.min(100, Math.max(0, (cushion / maxDd) * 100));
 
@@ -41,6 +42,9 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
             </span>
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
               {account.accountType}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+              {account.drawdownMode === 'PER_TRADE_CLOSE' ? 'Per-Trade' : 'EOD'} DD
             </span>
           </div>
           <h3 className="text-sm font-black text-gray-900 mt-1">{account.name}</h3>

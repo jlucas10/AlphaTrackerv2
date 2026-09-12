@@ -13,4 +13,8 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     List<Trade> findByUserId(Long userId);
 
     List<Trade> findAllByUserIdAndAccountIdOrderByTradeDateDesc(Long userId, Long accountId);
+
+    // Chronological order because the drawdown engine replays balance forward
+    // in time to find the high-water mark.
+    List<Trade> findAllByAccountIdOrderByTradeDateAsc(Long accountId);
 }

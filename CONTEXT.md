@@ -95,7 +95,7 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - [x] Frontend `useAccounts` hook, `AccountSelector`, and `CreateAccountModal`
 - [x] `TradeEntryModal` account selection
 - [x] Basic `DrawdownGauge` component
-- [ ] **UI Theme Alignment:** Restyle `DrawdownGauge` and `AccountSelector` to match the light-mode card palette (Issue #1)
+- [x] **UI Theme Alignment:** Restyle `DrawdownGauge` and `AccountSelector` to match the light-mode card palette (Issue #1)
 - [ ] **Drawdown Engine Implementation:** Implement `END_OF_DAY` vs `PER_TRADE_CLOSE` + `trailingStopsAtBalance` calculations (Issue #2)
 - [ ] **Account Backfill & Primary Account:** UI to set primary account and default unassigned trades to primary
 
