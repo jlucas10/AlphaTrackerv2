@@ -14,6 +14,14 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  servlet:
+    multipart:
+      # Mirrors TradeAttachmentService.MAX_FILE_SIZE_BYTES - keeping them in sync
+      # means an oversized upload is rejected by Spring before the request body
+      # is even fully read, instead of after we've buffered 10MB for nothing.
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 application:
   security:
     jwt:
