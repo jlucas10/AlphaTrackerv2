@@ -3,6 +3,7 @@ package com.alphatracker.api;
 import com.alphatracker.api.account.Account;
 import com.alphatracker.api.account.AccountRepository;
 import com.alphatracker.api.trade.Trade;
+import com.alphatracker.api.trade.TradeAttachmentService;
 import com.alphatracker.api.trade.TradeRepository;
 import com.alphatracker.api.trade.TradeRequest;
 import com.alphatracker.api.trade.TradeService;
@@ -35,6 +36,9 @@ public class TradeServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private TradeAttachmentService tradeAttachmentService;
 
     @InjectMocks
     private TradeService tradeService;
@@ -154,6 +158,7 @@ public class TradeServiceTest {
         // Assert
         assertEquals(50000.00, mockAccount.getCurrentBalance(), 0.01);
         verify(accountRepository, times(1)).save(mockAccount);
+        verify(tradeAttachmentService, times(1)).deleteAllAttachmentsForTrade(mockTrade);
         verify(tradeRepository, times(1)).delete(mockTrade);
     }
 
@@ -211,6 +216,7 @@ public class TradeServiceTest {
 
         verify(tradeRepository, never()).delete(any());
         verify(accountRepository, never()).save(any());
+        verify(tradeAttachmentService, never()).deleteAllAttachmentsForTrade(any());
     }
 
     @Test

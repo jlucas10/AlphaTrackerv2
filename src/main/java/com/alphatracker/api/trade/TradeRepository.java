@@ -1,6 +1,7 @@
 package com.alphatracker.api.trade;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;;
@@ -11,6 +12,11 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     // this method name and generate the SQL query behind the scenes:
     // "SELECT * FROM trade WHERE user_id = ?"
     List<Trade> findByUserId(Long userId);
+
+    // Ownership-checked single lookup, mirroring AccountRepository.findByIdAndUserId.
+    // Used by TradeAttachmentService so an upload can't be attached to a trade
+    // the requester doesn't own, without duplicating that check by hand.
+    Optional<Trade> findByIdAndUserId(Long id, Long userId);
 
     List<Trade> findAllByUserIdAndAccountIdOrderByTradeDateDesc(Long userId, Long accountId);
 

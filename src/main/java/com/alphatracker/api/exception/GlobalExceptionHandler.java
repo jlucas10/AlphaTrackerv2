@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.alphatracker.api.storage.StorageException;
+
 // Turns thrown exceptions into JSON the frontend can actually read.
 //
 // Spring's default error body omits the exception message unless
@@ -26,5 +28,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<Map<String, String>> handleSecurity(SecurityException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", ex.getMessage()));
+    }
+
+    // Disk I/O failures underneath StorageService (or a corrupted storage key
+    // escaping its base path) are an infrastructure problem, not something the
+    // client did wrong - 500, unlike the two handlers above.
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<Map<String, String>> handleStorage(StorageException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", ex.getMessage()));
     }
 }
