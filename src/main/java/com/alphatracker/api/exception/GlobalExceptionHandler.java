@@ -6,6 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import com.alphatracker.api.storage.StorageException;
 
 // Turns thrown exceptions into JSON the frontend can actually read.
 //
@@ -26,5 +29,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<Map<String, String>> handleSecurity(SecurityException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", ex.getMessage()));
+    }
+
+    // Disk I/O failures underneath StorageService (or a corrupted storage key
+    // escaping its base path) are an infrastructure problem, not something the
+    // client did wrong - 500, unlike the two handlers above.
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<Map<String, String>> handleStorage(StorageException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", ex.getMessage()));
+    }
+
+    // Spring rejects an over-limit multipart body (application.yml,
+    // spring.servlet.multipart.max-file-size) before TradeAttachmentService's
+    // own size check ever runs - without this handler it surfaces as a bare
+    // 500 with no "message" key, unlike every other rejection in this app.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(Map.of("message", "Uploaded file exceeds the maximum allowed size."));
     }
 }

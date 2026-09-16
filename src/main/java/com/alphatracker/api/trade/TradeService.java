@@ -19,6 +19,7 @@ public class TradeService {
     // simple for now)
     private final TradeRepository tradeRepository;
     private final AccountRepository accountRepository;
+    private final TradeAttachmentService tradeAttachmentService;
 
     // Builds a trade from the trader's raw inputs and saves it against the
     // authenticated user.
@@ -153,6 +154,12 @@ public class TradeService {
             account.setCurrentBalance(round(account.getCurrentBalance() - trade.getProfitLoss()));
             accountRepository.save(account);
         }
+
+        // Must run before tradeRepository.delete: trade_attachment.trade_id is a
+        // non-nullable FK with no cascade, so a trade with attachments left in
+        // place would fail this delete with a constraint violation instead of
+        // succeeding. See TradeAttachmentService.deleteAllAttachmentsForTrade.
+        tradeAttachmentService.deleteAllAttachmentsForTrade(trade);
 
         tradeRepository.delete(trade);
     }

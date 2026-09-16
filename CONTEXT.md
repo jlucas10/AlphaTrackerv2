@@ -102,7 +102,7 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 ### Sprint 3 — Rich Media & Journal Attachments
 
 - [ ] Journal view implementation (`/journal` route)
-- [ ] `StorageService` interface + local filesystem adapter (AWS S3 adapter configured for production deploy)
+- [x] `StorageService` interface + local filesystem adapter (AWS S3 adapter configured for production deploy)
 - [ ] `TradeAttachment` entity (`id`, `trade_id`, `storageKey`, `attachmentType`, `caption`)
 - [ ] Drag-and-drop & clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
 - [ ] Ownership checks on attachment retrieval (presigned URLs)
