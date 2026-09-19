@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useTrades } from '../hooks/useTrades';
 import { useAccount } from '../hooks/useAccounts';
+import { Sidebar } from '../components/layout/Sidebar';
 import { AccountSelector } from '../components/dashboard/AccountSelector';
 import { DrawdownGauge } from '../components/dashboard/DrawdownGauge';
 import { BackfillBanner } from '../components/dashboard/BackfillBanner';
@@ -14,8 +14,6 @@ import WinRateRing from '../components/dashboard/WinRateRing';
 import TradeTable from '../components/dashboard/TradeTable';
 
 const DashboardView: React.FC = () => {
-  const { logout } = useAuth();
-
   // Account State Hook
   const {
     accounts,
