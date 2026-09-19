@@ -104,7 +104,7 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - [ ] Journal view implementation (`/journal` route)
 - [x] `StorageService` interface + local filesystem adapter (AWS S3 adapter configured for production deploy)
 - [x] `TradeAttachment` entity (`id`, `trade_id`, `storageKey`, `attachmentType`, `caption`)
-- [ ] Drag-and-drop & clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
+- [x] Drag-and-drop & clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
 - [ ] Ownership checks on attachment retrieval (presigned URLs)
 - [ ] Structured trade reflection fields (HTF Bias, Execution Rating 1-5, Setup Model tags)
 
