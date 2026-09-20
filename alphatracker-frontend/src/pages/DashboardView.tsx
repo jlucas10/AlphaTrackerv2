@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useTrades } from '../hooks/useTrades';
 import { useAccount } from '../hooks/useAccounts';
+import { Sidebar } from '../components/layout/Sidebar';
 import { AccountSelector } from '../components/dashboard/AccountSelector';
 import { DrawdownGauge } from '../components/dashboard/DrawdownGauge';
 import { BackfillBanner } from '../components/dashboard/BackfillBanner';
@@ -14,8 +14,6 @@ import WinRateRing from '../components/dashboard/WinRateRing';
 import TradeTable from '../components/dashboard/TradeTable';
 
 const DashboardView: React.FC = () => {
-  const { logout } = useAuth();
-
   // Account State Hook
   const {
     accounts,
@@ -56,55 +54,7 @@ const DashboardView: React.FC = () => {
   return (
     <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
       
-      {/* ================= SIDEBAR NAVIGATION ================= */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col justify-between p-6">
-        <div>
-          {/* Branding Logo */}
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="grid grid-cols-2 gap-1 w-5 h-5">
-              <div className="bg-black rounded-xs"></div>
-              <div className="bg-black rounded-xs"></div>
-              <div className="bg-black rounded-xs"></div>
-              <div className="bg-black rounded-xs"></div>
-            </div>
-            <span className="font-black text-xl tracking-tight text-gray-900">AlphaTracker</span>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="space-y-1">
-            <button className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm transition-all shadow-xs">
-              <span>📊</span> Dashboard
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-black font-semibold text-sm transition-all rounded-xl hover:bg-gray-50">
-              <span>📈</span> Investing
-            </button>
-            <button
-              onClick={() => setIsCreateAccountOpen(true)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-black font-semibold text-sm transition-all rounded-xl hover:bg-gray-50"
-            >
-              <span>💳</span> Accounts
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-black font-semibold text-sm transition-all rounded-xl hover:bg-gray-50">
-              <span>📓</span> Trading Journal
-            </button>
-          </nav>
-        </div>
-
-        {/* User Profile Footer Section */}
-        <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
-              J
-            </div>
-            <div>
-              <p className="text-sm font-bold text-gray-900">Josiah</p>
-              <button onClick={logout} className="text-xs text-red-500 hover:underline font-semibold">
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </aside>
+      <Sidebar active="dashboard" onOpenAccounts={() => setIsCreateAccountOpen(true)} />
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <main className="flex-1 overflow-y-auto p-8 space-y-6">
