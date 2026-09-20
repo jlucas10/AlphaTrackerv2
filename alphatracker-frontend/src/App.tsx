@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthView from './pages/AuthView';
 import DashboardView from './pages/DashboardView';
+import JournalView from './pages/JournalView';
 
 // // Temporary Mock Components for the Views (We will build the actual beautiful layouts next!)
 // const LoginMock = () => (
@@ -37,6 +38,15 @@ const App: React.FC = () => {
                 <DashboardView/>
               </ProtectedRoute>
             } 
+          />
+
+          <Route
+            path="/journal"
+            element={
+              <ProtectedRoute>
+                <JournalView />
+              </ProtectedRoute>
+            }
           />
 
           {/* Catch-all: Redirect any random URL straight to the dashboard or login */}
