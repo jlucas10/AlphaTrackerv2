@@ -99,14 +99,31 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - [x] **Drawdown Engine Implementation:** Implement `END_OF_DAY` vs `PER_TRADE_CLOSE` + `trailingStopsAtBalance` calculations (Issue #2)
 - [x] **Account Backfill & Primary Account:** UI to set primary account and default unassigned trades to primary
 
-### Sprint 3 — Rich Media & Journal Attachments
+### Sprint 3 — Rich Media & Journal Attachments (Superseded by Sprint 3.5)
 
-- [ ] Journal view implementation (`/journal` route)
-- [x] `StorageService` interface + local filesystem adapter (AWS S3 adapter configured for production deploy)
-- [x] `TradeAttachment` entity (`id`, `trade_id`, `storageKey`, `attachmentType`, `caption`)
-- [x] Drag-and-drop & clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal` and Journal view
-- [ ] Ownership checks on attachment retrieval (presigned URLs)
-- [ ] Structured trade reflection fields (HTF Bias, Execution Rating 1-5, Setup Model tags)
+- [x] `StorageService` interface + local filesystem adapter (`LocalFileStorageService`). S3 adapter deliberately deferred to Sprint 5 deploy rather than built against no real bucket.
+- [x] `TradeAttachment` entity (`id`, `trade_id`, `storageKey`, `attachmentType`, `contentType`, `sizeBytes`, `caption`, `uploadedAt`) + `TradeAttachmentService` (upload validation, ownership-checked retrieval/delete, cascade cleanup on trade delete) + `TradeAttachmentController`.
+- [x] Drag-and-drop & clipboard paste (`Cmd+V`) screenshot upload in `TradeEntryModal`, via a reusable `AttachmentDropzone` component.
+- [x] Ownership checks on attachment retrieval — re-checked on every request (`findByIdAndTrade_User_Id`), not presigned URLs (no S3 adapter yet; see above).
+
+### Sprint 3.5 — Day-Scoped Journal Rework
+
+**Backend**
+
+- [ ] `JournalEntry` entity — one row per `(user, entryDate)`: `notes` (day-level reflection), `htfBias`. Auto-created on first write (no explicit "create entry" step).
+- [ ] Rename `TradeAttachment` → `JournalAttachment`; repoint FK from `trade_id` to `journal_entry_id`. Remove the now-unneeded attachment cascade-delete logic from `TradeService.deleteTrade` (attachments no longer belong to a trade).
+- [ ] `GET/PUT /api/v1/journal/{date}` — day bundle (notes + HTF bias + that day's trades) / upsert notes+bias.
+- [ ] `POST /api/v1/journal/{date}/attachments`, `DELETE /api/v1/journal-attachments/{id}`.
+- [ ] `Trade.executionRating` (1-5) and `Trade.setupTags` (freeform, reusable string tags — `@ElementCollection`, not a separate Tag entity) — trade-level, since different trades in the same day can use different setups.
+- [ ] `PATCH /api/v1/trades/{id}` — first update endpoint for trades at all; edits `executionRating` and `setupTags`. `Trade.notes` (the original trade-entry field) is left as-is, distinct from the new day-level journal notes.
+
+**Frontend**
+
+- [ ] `AttachmentDropzone` gets a light/dark theme variant — the color bug seen on the first `/journal` pass (hardcoded dark styling rendering as a solid black box on light cards) gets fixed as part of this rework, not patched in isolation.
+- [ ] `/journal` reworked into a calendar-style browse view (reusing the dashboard calendar's look), replacing the flat card-list first pass.
+- [ ] Day panel (opens on clicking a day in that calendar, or via `/journal?date=...` deep link): day notes + HTF bias, a shared screenshot gallery/dropzone for the day, and that day's trades listed with inline execution rating + setup tag chips per trade.
+- [ ] `DayDetailModal` (dashboard) stays exactly as today — read-only trades/P&L/win-rate/discipline stats — plus a pencil icon that deep-links to `/journal?date=...` for editing.
+- [ ] Retire `JournalEntryCard` (the per-trade card component from the first `/journal` pass) — superseded by the day panel.
 
 ### Sprint 4 — Monetization & Billing (Stripe Integration)
 
