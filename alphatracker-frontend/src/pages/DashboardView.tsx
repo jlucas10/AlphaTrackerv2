@@ -54,7 +54,7 @@ const DashboardView: React.FC = () => {
   return (
     <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
       
-      <Sidebar active="dashboard" onOpenAccounts={() => setIsCreateAccountOpen(true)} />
+      <Sidebar active="dashboard" />
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <main className="flex-1 overflow-y-auto p-8 space-y-6">

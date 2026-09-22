@@ -4,13 +4,18 @@ import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   active: 'dashboard' | 'journal';
-  onOpenAccounts?: () => void;
 }
 
 // Extracted from DashboardView so JournalView can share it rather than
 // duplicating the nav shell - the "Trading Journal" button here used to be
 // dead (no onClick at all); it now actually navigates.
-export const Sidebar: React.FC<SidebarProps> = ({ active, onOpenAccounts }) => {
+//
+// "Investing" and "Accounts" were dropped (not just hidden): Investing has no
+// page behind it and isn't planned, and Accounts had no dedicated page either
+// - it only ever opened CreateAccountModal, which AccountSelector already
+// triggers on its own. A backlog item exists in CONTEXT.md for a real
+// /accounts page; this nav entry can come back once that's built.
+export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -38,14 +43,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ active, onOpenAccounts }) => {
           <button onClick={() => navigate('/dashboard')} className={linkClass(active === 'dashboard')}>
             <span>📊</span> Dashboard
           </button>
-          <button className={linkClass(false)}>
-            <span>📈</span> Investing
-          </button>
-          {onOpenAccounts && (
-            <button onClick={onOpenAccounts} className={linkClass(false)}>
-              <span>💳</span> Accounts
-            </button>
-          )}
           <button onClick={() => navigate('/journal')} className={linkClass(active === 'journal')}>
             <span>📓</span> Trading Journal
           </button>
