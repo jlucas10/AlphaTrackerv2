@@ -1,5 +1,6 @@
 package com.alphatracker.api.trade;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,6 @@ public class TradeService {
     // simple for now)
     private final TradeRepository tradeRepository;
     private final AccountRepository accountRepository;
-    private final TradeAttachmentService tradeAttachmentService;
 
     // Builds a trade from the trader's raw inputs and saves it against the
     // authenticated user.
@@ -155,12 +155,38 @@ public class TradeService {
             accountRepository.save(account);
         }
 
-        // Must run before tradeRepository.delete: trade_attachment.trade_id is a
-        // non-nullable FK with no cascade, so a trade with attachments left in
-        // place would fail this delete with a constraint violation instead of
-        // succeeding. See TradeAttachmentService.deleteAllAttachmentsForTrade.
-        tradeAttachmentService.deleteAllAttachmentsForTrade(trade);
-
         tradeRepository.delete(trade);
+    }
+
+    // First (and only) mutation path for a trade after creation. Deliberately
+    // narrow - see TradeUpdateRequest for why prices/contracts/P&L stay immutable.
+    @Transactional
+    public Trade updateTrade(Long tradeId, TradeUpdateRequest request, User authenticatedUser) {
+        Trade trade = getTradeById(tradeId, authenticatedUser);
+
+        if (request.getExecutionRating() != null) {
+            int rating = request.getExecutionRating();
+            if (rating < 1 || rating > 5) {
+                throw new IllegalArgumentException("Execution rating must be between 1 and 5.");
+            }
+            trade.setExecutionRating(rating);
+        }
+
+        if (request.getSetupTags() != null) {
+            trade.setSetupTags(request.getSetupTags());
+        }
+
+        return tradeRepository.save(trade);
+    }
+
+    // Backs the journal day bundle (GET /api/v1/journal/{date}) - screenshots
+    // and notes live on JournalEntry now, but the day's trades themselves are
+    // still queried from here since Trade is unchanged.
+    @Transactional(readOnly = true)
+    public List<Trade> getTradesForDate(LocalDate date, User authenticatedUser) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime startOfNextDay = date.plusDays(1).atStartOfDay();
+        return tradeRepository.findAllByUserIdAndTradeDateBetweenOrderByTradeDateAsc(
+                authenticatedUser.getId(), startOfDay, startOfNextDay);
     }
 }

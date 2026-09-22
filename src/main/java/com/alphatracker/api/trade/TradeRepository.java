@@ -1,5 +1,6 @@
 package com.alphatracker.api.trade;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,11 +15,15 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     List<Trade> findByUserId(Long userId);
 
     // Ownership-checked single lookup, mirroring AccountRepository.findByIdAndUserId.
-    // Used by TradeAttachmentService so an upload can't be attached to a trade
-    // the requester doesn't own, without duplicating that check by hand.
     Optional<Trade> findByIdAndUserId(Long id, Long userId);
 
     List<Trade> findAllByUserIdAndAccountIdOrderByTradeDateDesc(Long userId, Long accountId);
+
+    // Backs the journal day bundle - [start, startOfNextDay) rather than a
+    // single-argument "date" comparison, since tradeDate is a LocalDateTime
+    // and a same-day range needs explicit bounds.
+    List<Trade> findAllByUserIdAndTradeDateBetweenOrderByTradeDateAsc(
+            Long userId, LocalDateTime start, LocalDateTime startOfNextDay);
 
     // Chronological order because the drawdown engine replays balance forward
     // in time to find the high-water mark.
