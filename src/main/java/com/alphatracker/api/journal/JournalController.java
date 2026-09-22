@@ -27,7 +27,7 @@ public class JournalController {
     public ResponseEntity<JournalDayResponse> getDay(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(buildDayResponse(date, user));
+        return ResponseEntity.ok(buildDayResponse(date, journalEntryService.getOrDefault(date, user), user));
     }
 
     // Upserts notes/HTF bias for the day - creates the JournalEntry row if
@@ -37,12 +37,13 @@ public class JournalController {
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestBody JournalDayRequest request,
             @AuthenticationPrincipal User user) {
-        journalEntryService.upsertNotes(date, request.getNotes(), request.getHtfBias(), user);
-        return ResponseEntity.ok(buildDayResponse(date, user));
+        JournalEntry entry = journalEntryService.upsertNotes(date, request.getNotes(), request.getHtfBias(), user);
+        return ResponseEntity.ok(buildDayResponse(date, entry, user));
     }
 
-    private JournalDayResponse buildDayResponse(LocalDate date, User user) {
-        JournalEntry entry = journalEntryService.getOrDefault(date, user);
+    // Takes the already-fetched/just-written entry rather than re-querying it,
+    // so a PUT doesn't pay for a redundant read right after its own write.
+    private JournalDayResponse buildDayResponse(LocalDate date, JournalEntry entry, User user) {
         List<JournalAttachment> attachments = journalAttachmentService.getAttachmentsForDate(date, user);
         List<Trade> trades = tradeService.getTradesForDate(date, user);
         return JournalDayResponse.fromEntities(date, entry, attachments, trades);

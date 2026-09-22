@@ -19,10 +19,11 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
 
     List<Trade> findAllByUserIdAndAccountIdOrderByTradeDateDesc(Long userId, Long accountId);
 
-    // Backs the journal day bundle - [start, startOfNextDay) rather than a
-    // single-argument "date" comparison, since tradeDate is a LocalDateTime
-    // and a same-day range needs explicit bounds.
-    List<Trade> findAllByUserIdAndTradeDateBetweenOrderByTradeDateAsc(
+    // Backs the journal day bundle - GreaterThanEqual/LessThan (not Between,
+    // which is inclusive on both ends) so a trade logged at exactly midnight
+    // the next day lands in tomorrow's results only, never double-counted
+    // into today's too.
+    List<Trade> findAllByUserIdAndTradeDateGreaterThanEqualAndTradeDateLessThanOrderByTradeDateAsc(
             Long userId, LocalDateTime start, LocalDateTime startOfNextDay);
 
     // Chronological order because the drawdown engine replays balance forward

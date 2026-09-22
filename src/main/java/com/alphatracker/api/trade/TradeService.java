@@ -186,7 +186,7 @@ public class TradeService {
     public List<Trade> getTradesForDate(LocalDate date, User authenticatedUser) {
         LocalDateTime startOfDay = date.atStartOfDay();
         LocalDateTime startOfNextDay = date.plusDays(1).atStartOfDay();
-        return tradeRepository.findAllByUserIdAndTradeDateBetweenOrderByTradeDateAsc(
+        return tradeRepository.findAllByUserIdAndTradeDateGreaterThanEqualAndTradeDateLessThanOrderByTradeDateAsc(
                 authenticatedUser.getId(), startOfDay, startOfNextDay);
     }
 }

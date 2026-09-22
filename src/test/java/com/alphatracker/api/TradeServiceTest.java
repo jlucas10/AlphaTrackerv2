@@ -341,7 +341,7 @@ public class TradeServiceTest {
 
         tradeService.getTradesForDate(date, mockUser);
 
-        verify(tradeRepository, times(1)).findAllByUserIdAndTradeDateBetweenOrderByTradeDateAsc(
+        verify(tradeRepository, times(1)).findAllByUserIdAndTradeDateGreaterThanEqualAndTradeDateLessThanOrderByTradeDateAsc(
                 mockUser.getId(), date.atStartOfDay(), date.plusDays(1).atStartOfDay());
     }
 
