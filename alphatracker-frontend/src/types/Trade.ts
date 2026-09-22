@@ -12,6 +12,10 @@ export interface Trade {
   followedPlan?: boolean | null;
   notes: string | null;
   tradeDate: string;
+  // Trade-level reflection fields (Sprint 3.5) - edited via PATCH /trades/{id},
+  // distinct from JournalEntry's day-level notes/htfBias.
+  executionRating?: number | null;
+  setupTags?: string[];
   user?: {
     id: number;
     email: string;

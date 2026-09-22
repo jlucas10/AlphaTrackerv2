@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import apiClient from '../api/apiClient';
-import { uploadAttachment } from '../api/attachments';
+import { deleteAttachment, uploadAttachment } from '../api/attachments';
 import type { Account } from '../types/Account';
-import type { Trade } from '../types/Trade';
+import type { Attachment } from '../types/Attachment';
 import { AttachmentDropzone } from './attachments/AttachmentDropzone';
-import { PendingAttachmentThumbnail } from './attachments/PendingAttachmentThumbnail';
+import { AttachmentThumbnail } from './attachments/AttachmentThumbnail';
 
 // Define imports and component interface
 interface TradeEntryModalProps {
@@ -57,16 +57,38 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     const [followedPlan, setFollowedPlan] = useState<boolean>(true);
     const [notes, setNotes] = useState<string>('');
 
-    // Screenshots are staged here (never uploaded) until the trade itself is
-    // saved - there's no tradeId to attach them to before that POST returns.
-    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-    // Set once the trade POST succeeds. Guards a retry after a partial
-    // upload failure from creating a second, duplicate trade - a retry only
-    // re-attempts the screenshots that failed, never the trade itself.
-    const [createdTradeId, setCreatedTradeId] = useState<number | null>(null);
+    // Screenshots upload immediately against the trade's date (journal
+    // attachments are day-scoped, not tied to a specific trade - see Sprint
+    // 3.5 in CONTEXT.md), so there's no need to wait for the trade to be
+    // saved or stage anything locally.
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [uploadingCount, setUploadingCount] = useState<number>(0);
+    const [uploadError, setUploadError] = useState<string>('');
 
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
+
+    const tradeDateOnly = tradeDate.slice(0, 10); // "YYYY-MM-DDTHH:mm" -> "YYYY-MM-DD"
+
+    const handleFilesSelected = async (files: File[]) => {
+        setUploadError('');
+        setUploadingCount((c) => c + files.length);
+        const results = await Promise.allSettled(files.map((file) => uploadAttachment(tradeDateOnly, file)));
+        setUploadingCount((c) => c - files.length);
+
+        const succeeded = results.filter((r): r is PromiseFulfilledResult<Attachment> => r.status === 'fulfilled');
+        setAttachments((prev) => [...prev, ...succeeded.map((r) => r.value)]);
+
+        const failedCount = results.length - succeeded.length;
+        if (failedCount > 0) {
+            setUploadError(`${failedCount} of ${files.length} screenshot(s) failed to upload.`);
+        }
+    };
+
+    const handleRemoveAttachment = async (id: number) => {
+        await deleteAttachment(id);
+        setAttachments((prev) => prev.filter((a) => a.id !== id));
+    };
 
     // The modal stays mounted while closed (the early return below renders null),
     // so state has to be cleared explicitly or the next open shows stale values.
@@ -80,8 +102,8 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
         setTradeDate(nowForInput());
         setFollowedPlan(true);
         setNotes('');
-        setPendingFiles([]);
-        setCreatedTradeId(null);
+        setAttachments([]);
+        setUploadError('');
         setError('');
     };
 
@@ -97,55 +119,27 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     setError('');
     setLoading(true);
 
+    // Keys match TradeRequest exactly. No commission and no profitLoss: both are
+    // derived server-side from the instrument's point value and round-turn fee.
+    const payload = {
+      ticker,
+      direction,
+      entryPrice: parseFloat(entryPrice),
+      exitPrice: parseFloat(exitPrice),
+      contracts: parseInt(contracts, 10),
+      followedPlan,
+      notes,
+      // "2026-08-14T09:30" — parses this straight into LocalDateTime.
+      tradeDate,
+      accountId: accountId || undefined, // Attach accountId to execution
+    };
+
     try {
-      // A retry after a partial upload failure lands here with createdTradeId
-      // already set, so the trade itself is never re-submitted - only the
-      // screenshots that failed get another attempt.
-      let tradeId = createdTradeId;
-
-      if (tradeId === null) {
-        // Keys match TradeRequest exactly. No commission and no profitLoss: both
-        // are derived server-side from the instrument's point value and
-        // round-turn fee.
-        const payload = {
-          ticker,
-          direction,
-          entryPrice: parseFloat(entryPrice),
-          exitPrice: parseFloat(exitPrice),
-          contracts: parseInt(contracts, 10),
-          followedPlan,
-          notes,
-          // "2026-08-14T09:30" — parses this straight into LocalDateTime.
-          tradeDate,
-          accountId: accountId || undefined, // Attach accountId to execution
-        };
-
-        const res = await apiClient.post<Trade>('/trades', payload);
-        tradeId = res.data.id;
-        setCreatedTradeId(tradeId);
-
-        // Refresh the dashboard as soon as the trade is committed, independent
-        // of whether the screenshot uploads below succeed - the trade is real
-        // either way, and shouldn't wait on attachments to show up.
-        await onTradeAdded();
-      }
-
-      if (pendingFiles.length > 0) {
-        const results = await Promise.allSettled(
-          pendingFiles.map((file) => uploadAttachment(tradeId as number, file)),
-        );
-        const stillPending = pendingFiles.filter((_, i) => results[i].status === 'rejected');
-
-        if (stillPending.length > 0) {
-          setPendingFiles(stillPending);
-          setLoading(false);
-          setError(
-            `Trade saved, but ${stillPending.length} screenshot(s) failed to upload. Try again, or remove them and close.`,
-          );
-          return; // Keep the modal open so the trader can retry just the uploads.
-        }
-      }
-
+      await apiClient.post('/trades', payload);
+      // Await the parent's refetch so the calendar and equity curve already show
+      // this trade by the time the modal disappears, rather than briefly showing
+      // stale totals.
+      await onTradeAdded();
       setLoading(false);
       resetForm();
       onClose();
@@ -328,24 +322,27 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                         />
                     </div>
 
-                    {/* Screenshots */}
+                    {/* Screenshots - upload immediately against the trade's date, since
+                        journal attachments are day-scoped rather than tied to this
+                        specific trade record. */}
                     <div>
                         <label className="block text-xs font-mono text-neutral-400 mb-1">
                             Chart Screenshots
                         </label>
-                        <AttachmentDropzone
-                            disabled={loading}
-                            onFilesSelected={(files) => setPendingFiles((prev) => [...prev, ...files])}
-                        />
-                        {pendingFiles.length > 0 && (
+                        <AttachmentDropzone disabled={uploadingCount > 0} onFilesSelected={handleFilesSelected} />
+                        {uploadingCount > 0 && (
+                            <p className="mt-2 text-xs font-mono text-neutral-500">Uploading...</p>
+                        )}
+                        {uploadError && (
+                            <p className="mt-2 text-xs font-mono text-rose-400">{uploadError}</p>
+                        )}
+                        {attachments.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
-                                {pendingFiles.map((file, index) => (
-                                    <PendingAttachmentThumbnail
-                                        key={`${file.name}-${file.lastModified}-${index}`}
-                                        file={file}
-                                        onRemove={() =>
-                                            setPendingFiles((prev) => prev.filter((_, i) => i !== index))
-                                        }
+                                {attachments.map((attachment) => (
+                                    <AttachmentThumbnail
+                                        key={attachment.id}
+                                        attachment={attachment}
+                                        onRemove={handleRemoveAttachment}
                                     />
                                 ))}
                             </div>
@@ -358,20 +355,14 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                             onClick={handleClose}
                             className="px-4 py-2 text-xs font-mono text-neutral-400 hover:text-neutral-200"
                         >
-                            {/* The trade is already saved once a retry is possible - "Cancel" would
-                                otherwise wrongly imply nothing happened yet. */}
-                            {createdTradeId !== null ? 'Close' : 'Cancel'}
+                            Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-medium rounded-lg transition disabled:opacity-50"
                         >
-                            {loading
-                                ? 'Posting...'
-                                : createdTradeId !== null
-                                  ? 'Retry Screenshot Upload'
-                                  : 'Save Trade'}
+                            {loading ? 'Posting...' : 'Save Trade'}
                         </button>
                     </div>
                 </form>
