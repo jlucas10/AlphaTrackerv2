@@ -156,8 +156,17 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
   // read as one consistent "entry form" style, distinct from the light
   // dashboard cards behind them.
   return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
-            <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-2xl">
+        // Clicking the backdrop closes (via handleClose, same as the ✕ button
+        // and Cancel, so the form resets either way); stopPropagation on the
+        // card keeps a click inside the dialog from bubbling up and closing it.
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4"
+            onClick={handleClose}
+        >
+            <div
+                className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
                     <h2 className="text-base font-bold text-white font-mono">Log Execution</h2>
                     <button

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../../api/apiClient';
 import type { Attachment } from '../../types/Attachment';
+import { AttachmentLightbox } from './AttachmentLightbox';
 
 interface AttachmentThumbnailProps {
   attachment: Attachment;
@@ -16,6 +17,7 @@ interface AttachmentThumbnailProps {
 export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attachment, onRemove, theme = 'dark' }) => {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +64,8 @@ export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attach
         <img
           src={objectUrl}
           alt={attachment.caption ?? 'Trade screenshot'}
-          className="w-full h-full object-cover"
+          onClick={() => setExpanded(true)}
+          className="w-full h-full object-cover cursor-pointer"
         />
       )}
       {onRemove && (
@@ -73,6 +76,9 @@ export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attach
         >
           ✕
         </button>
+      )}
+      {expanded && objectUrl && (
+        <AttachmentLightbox attachment={attachment} objectUrl={objectUrl} onClose={() => setExpanded(false)} />
       )}
     </div>
   );

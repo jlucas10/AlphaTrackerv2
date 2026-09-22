@@ -117,16 +117,36 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - [x] `Trade.executionRating` (1-5) and `Trade.setupTags` (`@ElementCollection<String>`) — trade-level.
 - [x] `PATCH /api/v1/trades/{id}` — first update endpoint for trades at all; edits `executionRating` and `setupTags` only. `Trade.notes` (original trade-entry field) left as-is, distinct from day-level journal notes.
 - [x] **Bug found & fixed in review:** the day-range query for "trades on this date" used JPA's `Between` (inclusive both ends), so a trade logged at exactly midnight the next day would double-count into today's bundle too. Fixed with explicit `GreaterThanEqual`/`LessThan` bounds; verified live against a trade logged at exactly `T+1 00:00:00`.
-- [x] **Security bug found & fixed in review:** `Trade.user` embeds a full `User` object with no DTO in between, and `User.password` (the bcrypt hash) had no `@JsonIgnore` — so `GET /trades` *and* the new `GET /journal/{date}` were both leaking password hashes in every trade response. Fixed at the source (`@JsonIgnore` on `User.password`), protecting every current and future endpoint that ever serializes a `Trade`.
+- [x] **Security bug found & fixed in review:** `Trade.user` embeds a full `User` object with no DTO in between, and `User.password` (the bcrypt hash) had no `@JsonIgnore` — so `GET /trades` _and_ the new `GET /journal/{date}` were both leaking password hashes in every trade response. Fixed at the source (`@JsonIgnore` on `User.password`), protecting every current and future endpoint that ever serializes a `Trade`.
 - [x] 65 backend tests passing (7 new test classes covering `JournalEntry`, `JournalAttachment`, `JournalController` at repository/service/controller layers).
 
-**Frontend (not started)**
+**Frontend **
 
-- [ ] `AttachmentDropzone` gets a light/dark theme variant — the color bug seen on the first `/journal` pass (hardcoded dark styling rendering as a solid black box on light cards) gets fixed as part of this rework, not patched in isolation.
-- [ ] `/journal` reworked into a calendar-style browse view (reusing the dashboard calendar's look), replacing the flat card-list first pass.
-- [ ] Day panel (opens on clicking a day in that calendar, or via `/journal?date=...` deep link): day notes + HTF bias, a shared screenshot gallery/dropzone for the day, and that day's trades listed with inline execution rating + setup tag chips per trade.
-- [ ] `DayDetailModal` (dashboard) stays exactly as today — read-only trades/P&L/win-rate/discipline stats — plus a pencil icon that deep-links to `/journal?date=...` for editing.
-- [ ] Retire `JournalEntryCard` (the per-trade card component from the first `/journal` pass) — superseded by the day panel.
+- [x] `AttachmentDropzone`/`AttachmentThumbnail` get a light/dark `theme` prop — fixes both the color bug (hardcoded dark styling on light cards) and a broken retrieval path caught in review (`/attachments/` → `/journal-attachments/`).
+- [x] `/journal` reworked into a calendar-style browse view (`JournalCalendar`, reusing the dashboard's `CalendarDayCell` extended with `alwaysInteractive` so empty days are still clickable), replacing the flat card-list first pass.
+- [x] Day panel (`JournalDayPanel`, opens on clicking a day, or via `/journal?date=...` deep link): day notes + HTF bias, a shared screenshot gallery/dropzone, and that day's trades listed via `JournalTradeCard` (inline execution rating stars + `TagInput` setup tag chips).
+- [x] `DayDetailModal` (dashboard) stays exactly as before — read-only trades/P&L/win-rate/discipline stats — plus a pencil icon that deep-links to `/journal?date=...` for editing.
+- [x] Retired `JournalEntryCard`/`PendingAttachmentThumbnail`/old `useAttachments.ts` (trade-scoped, superseded by day-scoped `useJournalDay`).
+- [x] `TradeEntryModal` simplified — screenshots upload immediately against the trade's date (day-scoped, no `tradeId` needed), removing the staged-file/retry/`createdTradeId` mechanism that only existed for the old trade-scoped model.
+- [x] `AttachmentLightbox` — click a thumbnail to view full-size, reusing the already-fetched blob (no extra request). Native pinch/`Cmd+/-` zoom works on it; a custom in-app zoom control was considered and deliberately skipped.
+- [x] Click-outside-to-close on `CreateAccountModal` and `TradeEntryModal`, matching the pattern already used by `DayDetailModal`/`JournalDayPanel`.
+
+### Backlog — Accounts Lifecycle & Management Page (not scheduled)
+
+Raised while reviewing Sprint 3.5: the sidebar's "Accounts" button currently just pops `CreateAccountModal` directly — there's no page to browse, manage, or retire accounts. Requirements as discussed:
+
+- See all accounts created, grouped (Eval / Funded / Failed).
+- Delete an account.
+- Mark an evaluation account **Passed**, prompting "make your funded account now" — this should create a _new_, separate `Account` row (eval and funded accounts have different starting balances/drawdown rules at most firms), not mutate the eval account's `accountType` in place, so each phase's trades/stats stay cleanly separated by `account_id` the way they already do.
+- Mark an account **Failed** (blew the drawdown, dropped below the buffer, etc.).
+
+Design sketch for when this gets picked up:
+
+- `Account.status` enum (`ACTIVE` / `PASSED` / `FAILED`), replacing the current plain `active` boolean — "passed" and "failed" are both "inactive" but read very differently in the UI.
+- `Account.promotedToAccountId` — nullable, self-referencing FK, set when an eval is marked Passed and its funded account is created, so the UI can show the lineage ("this funded account came from Eval #1").
+- `DELETE /api/v1/accounts/{id}` — does not exist yet at all.
+- An endpoint to mark Passed + create the linked funded account in one step.
+- A real `/accounts` route/page on the frontend, replacing the sidebar's direct-to-modal shortcut (though "Create Account" would still live there as an action).
 
 ### Sprint 4 — Monetization & Billing (Stripe Integration)
 
@@ -143,6 +163,23 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - [ ] Docker containerization & AWS deployment (ECS/Fargate + RDS PostgreSQL)
 
 ---
+
+### Backlog — Accounts Lifecycle & Management Page (not scheduled)
+
+Raised while reviewing Sprint 3.5: the sidebar's "Accounts" button currently just pops `CreateAccountModal` directly — there's no page to browse, manage, or retire accounts. Requirements as discussed:
+
+- See all accounts created, grouped (Eval / Funded / Failed).
+- Delete an account.
+- Mark an evaluation account **Passed**, prompting "make your funded account now" — this should create a _new_, separate `Account` row (eval and funded accounts have different starting balances/drawdown rules at most firms), not mutate the eval account's `accountType` in place, so each phase's trades/stats stay cleanly separated by `account_id` the way they already do.
+- Mark an account **Failed** (blew the drawdown, dropped below the buffer, etc.).
+
+Design sketch for when this gets picked up:
+
+- `Account.status` enum (`ACTIVE` / `PASSED` / `FAILED`), replacing the current plain `active` boolean — "passed" and "failed" are both "inactive" but read very differently in the UI.
+- `Account.promotedToAccountId` — nullable, self-referencing FK, set when an eval is marked Passed and its funded account is created, so the UI can show the lineage ("this funded account came from Eval #1").
+- `DELETE /api/v1/accounts/{id}` — does not exist yet at all.
+- An endpoint to mark Passed + create the linked funded account in one step.
+- A real `/accounts` route/page on the frontend, replacing the sidebar's direct-to-modal shortcut (though "Create Account" would still live there as an action).
 
 ## Drawdown Rules (Resolved)
 
