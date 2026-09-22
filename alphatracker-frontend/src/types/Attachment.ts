@@ -1,19 +1,21 @@
+// Mirrors JournalAttachmentResponse - attachments are day-scoped (Sprint 3.5),
+// not tied to an individual trade.
 export interface Attachment {
   id: number;
-  tradeId: number;
+  journalEntryId: number;
   attachmentType: string;
   contentType: string;
   sizeBytes: number;
   caption: string | null;
   uploadedAt: string;
-  // Server-absolute path (e.g. "/api/v1/attachments/10/file"). Not used
-  // directly for fetching - apiClient's baseURL already includes "/api/v1",
-  // so components build their own request path from `id` instead (see
-  // AttachmentThumbnail). Kept here mainly for display/debugging.
+  // Server-absolute path (e.g. "/api/v1/journal-attachments/10/file"). Not
+  // used directly for fetching - apiClient's baseURL already includes
+  // "/api/v1", so components build their own request path from `id` instead
+  // (see AttachmentThumbnail). Kept here mainly for display/debugging.
   url: string;
 }
 
-// Mirrors TradeAttachmentService's server-side rules exactly, so a rejected
+// Mirrors JournalAttachmentService's server-side rules exactly, so a rejected
 // file is caught here with instant feedback instead of round-tripping to the
 // server first to learn the same thing.
 export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import type { Trade } from '../../types/Trade';
 import TradeRow from './TradeRow';
 import { formatUsd } from '../../utils/formatters';
@@ -12,8 +13,16 @@ interface DayDetailModalProps {
 }
 
 const DayDetailModal: React.FC<DayDetailModalProps> = ({ day, trades, onClose, onDelete }) => {
+  const navigate = useNavigate();
   const dayTotal = trades.reduce((sum, t) => sum + t.profitLoss, 0);
   const wins = trades.filter((t) => t.profitLoss > 0).length;
+
+  // This modal stays pure read-only stats by design (Sprint 3.5) - editing
+  // notes/screenshots/reflections happens on the journal's day panel instead,
+  // reached via this deep link.
+  const goToJournalEntry = () => {
+    navigate(`/journal?date=${format(day, 'yyyy-MM-dd')}`);
+  };
 
   return (
     // Clicking the backdrop closes; the stopPropagation on the panel keeps a
@@ -48,6 +57,14 @@ const DayDetailModal: React.FC<DayDetailModalProps> = ({ day, trades, onClose, o
                 {formatUsd(dayTotal)}
               </p>
             </div>
+            <button
+              onClick={goToJournalEntry}
+              type="button"
+              title="Edit journal entry for this day"
+              className="text-gray-300 hover:text-emerald-600 text-lg transition-colors"
+            >
+              ✏️
+            </button>
             <button
               onClick={onClose}
               type="button"

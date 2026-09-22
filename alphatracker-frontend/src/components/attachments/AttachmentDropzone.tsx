@@ -4,6 +4,11 @@ import { ALLOWED_ATTACHMENT_CONTENT_TYPES, MAX_ATTACHMENT_SIZE_BYTES } from '../
 interface AttachmentDropzoneProps {
   onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
+  // 'dark' (default) matches TradeEntryModal's dark surface. 'light' matches
+  // the dashboard/journal's white-card look - without this, the dropzone
+  // hardcoded dark styling and rendered as a solid black box on light cards
+  // (the bug seen on the first /journal pass).
+  theme?: 'dark' | 'light';
 }
 
 function validate(file: File): string | null {
@@ -21,7 +26,11 @@ function validate(file: File): string | null {
 // no tradeId yet during creation); the Journal view uploads immediately since
 // its trade already exists. Keeping this component upload-agnostic lets both
 // screens reuse it without forcing one flow onto the other.
-export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({ onFilesSelected, disabled }) => {
+export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({
+  onFilesSelected,
+  disabled,
+  theme = 'dark',
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +70,15 @@ export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({ onFilesS
     if (files.length > 0) acceptFiles(files);
   };
 
+  const isDark = theme === 'dark';
+  const idleClasses = isDark ? 'border-neutral-800 bg-neutral-950' : 'border-gray-200 bg-gray-50';
+  const draggingClasses = isDark
+    ? 'border-emerald-500 bg-emerald-950/20'
+    : 'border-emerald-400 bg-emerald-50';
+  const primaryTextClass = isDark ? 'text-neutral-400' : 'text-gray-500';
+  const secondaryTextClass = isDark ? 'text-neutral-600' : 'text-gray-400';
+  const fontClass = isDark ? 'font-mono' : 'font-semibold';
+
   return (
     <div>
       <div
@@ -74,13 +92,13 @@ export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({ onFilesS
         onPaste={handlePaste}
         onClick={() => !disabled && inputRef.current?.click()}
         className={`cursor-pointer border-2 border-dashed rounded-lg px-4 py-6 text-center transition ${
-          isDragging ? 'border-emerald-500 bg-emerald-950/20' : 'border-neutral-800 bg-neutral-950'
+          isDragging ? draggingClasses : idleClasses
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <p className="text-xs font-mono text-neutral-400">
+        <p className={`text-xs ${fontClass} ${primaryTextClass}`}>
           Drag & drop a screenshot, paste (Cmd+V), or click to browse
         </p>
-        <p className="text-[10px] font-mono text-neutral-600 mt-1">PNG, JPEG, WEBP, GIF — up to 10MB</p>
+        <p className={`text-[10px] ${fontClass} ${secondaryTextClass} mt-1`}>PNG, JPEG, WEBP, GIF — up to 10MB</p>
         <input
           ref={inputRef}
           type="file"
@@ -94,7 +112,11 @@ export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({ onFilesS
           }}
         />
       </div>
-      {validationError && <p className="mt-2 text-xs font-mono text-rose-400">{validationError}</p>}
+      {validationError && (
+        <p className={`mt-2 text-xs ${fontClass} ${isDark ? 'text-rose-400' : 'text-red-500'}`}>
+          {validationError}
+        </p>
+      )}
     </div>
   );
 };

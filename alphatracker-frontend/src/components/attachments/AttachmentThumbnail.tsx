@@ -5,14 +5,15 @@ import type { Attachment } from '../../types/Attachment';
 interface AttachmentThumbnailProps {
   attachment: Attachment;
   onRemove?: (id: number) => void;
+  theme?: 'dark' | 'light';
 }
 
 // The retrieval endpoint requires a JWT and re-checks ownership on every call
-// (see TradeAttachmentController), but a plain <img src="..."> can't carry an
-// Authorization header. So the bytes are fetched through apiClient (which
+// (see JournalAttachmentController), but a plain <img src="..."> can't carry
+// an Authorization header. So the bytes are fetched through apiClient (which
 // does attach it) as a blob, and an object URL is created for the <img> tag
 // to point at instead - this is the standard workaround for auth-gated images.
-export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attachment, onRemove }) => {
+export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attachment, onRemove, theme = 'dark' }) => {
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -21,7 +22,7 @@ export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attach
     let localUrl: string | null = null;
 
     apiClient
-      .get(`/attachments/${attachment.id}/file`, { responseType: 'blob' })
+      .get(`/journal-attachments/${attachment.id}/file`, { responseType: 'blob' })
       .then((res) => {
         if (cancelled) return;
         localUrl = URL.createObjectURL(res.data);
@@ -39,10 +40,24 @@ export const AttachmentThumbnail: React.FC<AttachmentThumbnailProps> = ({ attach
     };
   }, [attachment.id]);
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className="relative group w-20 h-20 rounded-lg overflow-hidden border border-neutral-800 bg-neutral-950 flex items-center justify-center shrink-0">
-      {failed && <span className="text-[10px] text-rose-400 font-mono">Failed</span>}
-      {!failed && !objectUrl && <span className="text-[10px] text-neutral-500 font-mono">...</span>}
+    <div
+      className={`relative group w-20 h-20 rounded-lg overflow-hidden border flex items-center justify-center shrink-0 ${
+        isDark ? 'border-neutral-800 bg-neutral-950' : 'border-gray-200 bg-gray-50'
+      }`}
+    >
+      {failed && (
+        <span className={`text-[10px] ${isDark ? 'text-rose-400 font-mono' : 'text-red-500 font-semibold'}`}>
+          Failed
+        </span>
+      )}
+      {!failed && !objectUrl && (
+        <span className={`text-[10px] ${isDark ? 'text-neutral-500 font-mono' : 'text-gray-400 font-semibold'}`}>
+          ...
+        </span>
+      )}
       {objectUrl && (
         <img
           src={objectUrl}
