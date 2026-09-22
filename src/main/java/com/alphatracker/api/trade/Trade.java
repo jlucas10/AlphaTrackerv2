@@ -1,12 +1,16 @@
 package com.alphatracker.api.trade;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.alphatracker.api.account.Account;
 import com.alphatracker.api.user.User;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -76,5 +80,22 @@ public class Trade {
     @JoinColumn(name = "account_id", nullable = true)
     @JsonIgnore
     private Account account;
+
+    // Trade-level reflection fields (Sprint 3.5). Distinct from `notes` above
+    // (the original quick-capture field from trade entry) and from
+    // JournalEntry.notes/htfBias (day-level reflection) - these grade one
+    // specific execution, since different trades in the same day can use
+    // different setups and execute with different quality.
+    private Integer executionRating; // 1-5, self-graded
+
+    // Freeform, reusable tag strings rather than a separate Tag entity -
+    // still gives real multi-select chips in the UI (autocompleting over a
+    // trader's own previously-used tags), just without a whole CRUD surface
+    // for a bounded, low-cardinality set of short strings.
+    @ElementCollection
+    @CollectionTable(name = "trade_setup_tag", joinColumns = @JoinColumn(name = "trade_id"))
+    @Column(name = "tag")
+    @Builder.Default
+    private List<String> setupTags = new ArrayList<>();
 
 }

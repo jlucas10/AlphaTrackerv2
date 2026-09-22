@@ -53,6 +53,16 @@ public class TradeController {
         return ResponseEntity.ok(tradeService.getTradeById(id, user));
     }
 
+    // Handles PATCH requests to /api/v1/trades/{id}. Narrow on purpose - see
+    // TradeUpdateRequest for what's editable and why.
+    @PatchMapping("/{id}")
+    public ResponseEntity<Trade> updateTrade(
+            @PathVariable Long id,
+            @RequestBody TradeUpdateRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(tradeService.updateTrade(id, request, user));
+    }
+
     // Handles DELETE requests to /api/v1/trades/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteTrade(

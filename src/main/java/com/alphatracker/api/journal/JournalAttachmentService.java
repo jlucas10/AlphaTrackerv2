@@ -1,6 +1,7 @@
-package com.alphatracker.api.trade;
+package com.alphatracker.api.journal;
 
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -10,16 +11,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.alphatracker.api.storage.StorageService;
 import com.alphatracker.api.storage.StoredFile;
+import com.alphatracker.api.trade.AttachmentType;
 import com.alphatracker.api.user.User;
 
 import lombok.RequiredArgsConstructor;
 
-// Business logic for trade screenshots: validates uploads, enforces ownership,
-// and keeps TradeAttachment rows (Postgres) and their bytes (StorageService)
-// in sync - every write here either updates both or neither, never one alone.
+// Business logic for day-journal screenshots: validates uploads, enforces
+// ownership, and keeps JournalAttachment rows (Postgres) and their bytes
+// (StorageService) in sync - every write here either updates both or
+// neither, never one alone.
 @Service
 @RequiredArgsConstructor
-public class TradeAttachmentService {
+public class JournalAttachmentService {
 
     // Screenshots only, and capped well above what a screen-capture tool
     // produces - this exists to stop a single oversized upload from filling
@@ -28,27 +31,25 @@ public class TradeAttachmentService {
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/png", "image/jpeg", "image/webp", "image/gif");
 
-    private final TradeAttachmentRepository attachmentRepository;
-    private final TradeRepository tradeRepository;
+    private final JournalAttachmentRepository attachmentRepository;
+    private final JournalEntryService journalEntryService;
     private final StorageService storageService;
 
-    // Uploads one screenshot onto an existing trade. Ownership is checked
-    // against the trade (not the attachment, which doesn't exist yet) via the
-    // same findByIdAndUserId pattern AccountService/TradeService already use.
+    // Uploads one screenshot onto a day's journal entry, creating that entry
+    // if this is the first write for the day (see JournalEntryService.findOrCreate).
     @Transactional
-    public TradeAttachment uploadAttachment(Long tradeId, InputStream content, long sizeBytes,
+    public JournalAttachment uploadAttachment(LocalDate date, InputStream content, long sizeBytes,
             String originalFilename, String contentType, String caption, User authenticatedUser) {
-        Trade trade = tradeRepository.findByIdAndUserId(tradeId, authenticatedUser.getId())
-                .orElseThrow(() -> new IllegalArgumentException("Trade not found or does not belong to user."));
-
         validateContentType(contentType);
         validateSize(sizeBytes);
+
+        JournalEntry entry = journalEntryService.findOrCreate(date, authenticatedUser);
 
         StoredFile stored = storageService.store(content, sizeBytes, originalFilename, contentType,
                 authenticatedUser.getId());
 
-        TradeAttachment attachment = TradeAttachment.builder()
-                .trade(trade)
+        JournalAttachment attachment = JournalAttachment.builder()
+                .journalEntry(entry)
                 .storageKey(stored.storageKey())
                 .attachmentType(AttachmentType.SCREENSHOT)
                 .contentType(stored.contentType())
@@ -60,51 +61,40 @@ public class TradeAttachmentService {
         return attachmentRepository.save(attachment);
     }
 
+    // A day with no JournalEntry yet (nothing written for it) simply has no
+    // attachments - no row needs to exist just to answer this query.
     @Transactional(readOnly = true)
-    public List<TradeAttachment> getAttachmentsForTrade(Long tradeId, User authenticatedUser) {
-        return attachmentRepository.findAllByTrade_IdAndTrade_User_IdOrderByUploadedAtAsc(tradeId,
-                authenticatedUser.getId());
+    public List<JournalAttachment> getAttachmentsForDate(LocalDate date, User authenticatedUser) {
+        JournalEntry entry = journalEntryService.getOrDefault(date, authenticatedUser);
+        if (entry.getId() == null) {
+            return List.of();
+        }
+        return attachmentRepository.findAllByJournalEntry_IdOrderByUploadedAtAsc(entry.getId());
     }
 
     // Returns the attachment row (metadata + ownership check) so a controller
     // can set the right Content-Type/filename before streaming the bytes.
     @Transactional(readOnly = true)
-    public TradeAttachment getAttachmentForDownload(Long attachmentId, User authenticatedUser) {
-        return attachmentRepository.findByIdAndTrade_User_Id(attachmentId, authenticatedUser.getId())
+    public JournalAttachment getAttachmentForDownload(Long attachmentId, User authenticatedUser) {
+        return attachmentRepository.findByIdAndJournalEntry_User_Id(attachmentId, authenticatedUser.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found or does not belong to user."));
     }
 
     // Kept separate from getAttachmentForDownload so a controller can send
     // headers (built from the already-fetched row) before opening the byte
     // stream, instead of buffering the whole file in memory first.
-    public InputStream openAttachmentContent(TradeAttachment attachment) {
+    public InputStream openAttachmentContent(JournalAttachment attachment) {
         return storageService.retrieve(attachment.getStorageKey());
     }
 
     @Transactional
     public void deleteAttachment(Long attachmentId, User authenticatedUser) {
-        TradeAttachment attachment = attachmentRepository.findByIdAndTrade_User_Id(attachmentId, authenticatedUser.getId())
+        JournalAttachment attachment = attachmentRepository
+                .findByIdAndJournalEntry_User_Id(attachmentId, authenticatedUser.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found or does not belong to user."));
 
         storageService.delete(attachment.getStorageKey());
         attachmentRepository.delete(attachment);
-    }
-
-    // Called by TradeService.deleteTrade before the trade row itself is
-    // deleted. trade_attachment.trade_id is a non-nullable FK with no cascade
-    // configured, so without this a trade with attachments would fail to
-    // delete with a constraint violation instead of a clean 200. Deletes disk
-    // files first, then rows, so a mid-failure never leaves an orphaned row
-    // pointing at bytes that no longer exist.
-    @Transactional
-    public void deleteAllAttachmentsForTrade(Trade trade) {
-        List<TradeAttachment> attachments = attachmentRepository
-                .findAllByTrade_IdAndTrade_User_IdOrderByUploadedAtAsc(trade.getId(), trade.getUser().getId());
-
-        for (TradeAttachment attachment : attachments) {
-            storageService.delete(attachment.getStorageKey());
-        }
-        attachmentRepository.deleteAll(attachments);
     }
 
     private void validateContentType(String contentType) {

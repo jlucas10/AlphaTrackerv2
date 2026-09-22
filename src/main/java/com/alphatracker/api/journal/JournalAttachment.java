@@ -1,7 +1,8 @@
-package com.alphatracker.api.trade;
+package com.alphatracker.api.journal;
 
 import java.time.LocalDateTime;
 
+import com.alphatracker.api.trade.AttachmentType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
@@ -20,33 +21,31 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-// A screenshot/media file attached to a Trade. This row never holds the file
-// bytes themselves - storageKey is the opaque pointer StorageService.store()
-// returned, and ownership is always resolved by walking trade -> user, never
-// by trusting anything on this entity directly (see TradeAttachmentService).
+// A screenshot/media file attached to a day's JournalEntry (not a single
+// Trade - see Sprint 3.5 in CONTEXT.md for why this moved day-level). This
+// row never holds the file bytes themselves - storageKey is the opaque
+// pointer StorageService.store() returned, and ownership is always resolved
+// by walking journalEntry -> user, never trusted on this entity directly.
 @Entity
-@Table(name = "trade_attachment")
+@Table(name = "journal_attachment")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TradeAttachment {
+public class JournalAttachment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Owning side of the relationship. LAZY + JsonIgnore mirrors Trade.account:
-    // callers reach attachments through TradeAttachmentService (which already
-    // knows the trade), not by serializing the parent trade back out here.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trade_id", nullable = false)
+    @JoinColumn(name = "journal_entry_id", nullable = false)
     @JsonIgnore
-    private Trade trade;
+    private JournalEntry journalEntry;
 
     // Opaque key handed back by StorageService.store(). Never exposed to the
-    // frontend directly - retrieval goes through an ownership-checked endpoint,
-    // never a raw storageKey/path.
+    // frontend directly - retrieval goes through an ownership-checked
+    // endpoint, never a raw storageKey/path.
     @Column(nullable = false)
     private String storageKey;
 

@@ -3,10 +3,10 @@ package com.alphatracker.api;
 import com.alphatracker.api.account.Account;
 import com.alphatracker.api.account.AccountRepository;
 import com.alphatracker.api.trade.Trade;
-import com.alphatracker.api.trade.TradeAttachmentService;
 import com.alphatracker.api.trade.TradeRepository;
 import com.alphatracker.api.trade.TradeRequest;
 import com.alphatracker.api.trade.TradeService;
+import com.alphatracker.api.trade.TradeUpdateRequest;
 import com.alphatracker.api.user.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,10 +14,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.exceptions.base.MockitoException;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,9 +36,6 @@ public class TradeServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
-
-    @Mock
-    private TradeAttachmentService tradeAttachmentService;
 
     @InjectMocks
     private TradeService tradeService;
@@ -158,7 +155,6 @@ public class TradeServiceTest {
         // Assert
         assertEquals(50000.00, mockAccount.getCurrentBalance(), 0.01);
         verify(accountRepository, times(1)).save(mockAccount);
-        verify(tradeAttachmentService, times(1)).deleteAllAttachmentsForTrade(mockTrade);
         verify(tradeRepository, times(1)).delete(mockTrade);
     }
 
@@ -216,7 +212,6 @@ public class TradeServiceTest {
 
         verify(tradeRepository, never()).delete(any());
         verify(accountRepository, never()).save(any());
-        verify(tradeAttachmentService, never()).deleteAllAttachmentsForTrade(any());
     }
 
     @Test
@@ -292,6 +287,62 @@ public class TradeServiceTest {
 
         assertNull(result.getAccount());
         verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should update execution rating and setup tags via PATCH")
+    void testUpdateTradeSetsReflectionFields() {
+        Trade existing = Trade.builder().id(42L).user(mockUser).build();
+        when(tradeRepository.findById(42L)).thenReturn(Optional.of(existing));
+        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TradeUpdateRequest request = TradeUpdateRequest.builder()
+                .executionRating(4)
+                .setupTags(List.of("FVG fill", "liquidity sweep"))
+                .build();
+
+        Trade result = tradeService.updateTrade(42L, request, mockUser);
+
+        assertEquals(4, result.getExecutionRating());
+        assertEquals(List.of("FVG fill", "liquidity sweep"), result.getSetupTags());
+        verify(tradeRepository, times(1)).save(existing);
+    }
+
+    @Test
+    @DisplayName("Should reject an execution rating outside 1-5")
+    void testUpdateTradeRejectsOutOfRangeRating() {
+        Trade existing = Trade.builder().id(42L).user(mockUser).build();
+        when(tradeRepository.findById(42L)).thenReturn(Optional.of(existing));
+
+        TradeUpdateRequest request = TradeUpdateRequest.builder().executionRating(6).build();
+
+        assertThrows(IllegalArgumentException.class, () -> tradeService.updateTrade(42L, request, mockUser));
+        verify(tradeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should reject updating a trade owned by another user")
+    void testUpdateTradeUnauthorizedThrowsException() {
+        User otherUser = new User();
+        otherUser.setId(2L);
+        Trade otherUserTrade = Trade.builder().id(101L).user(otherUser).build();
+        when(tradeRepository.findById(101L)).thenReturn(Optional.of(otherUserTrade));
+
+        TradeUpdateRequest request = TradeUpdateRequest.builder().executionRating(3).build();
+
+        assertThrows(SecurityException.class, () -> tradeService.updateTrade(101L, request, mockUser));
+        verify(tradeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should query trades within the given calendar day's bounds")
+    void testGetTradesForDateUsesDayBounds() {
+        LocalDate date = LocalDate.of(2026, 9, 18);
+
+        tradeService.getTradesForDate(date, mockUser);
+
+        verify(tradeRepository, times(1)).findAllByUserIdAndTradeDateGreaterThanEqualAndTradeDateLessThanOrderByTradeDateAsc(
+                mockUser.getId(), date.atStartOfDay(), date.plusDays(1).atStartOfDay());
     }
 
 }
