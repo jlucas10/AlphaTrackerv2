@@ -7,6 +7,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -37,6 +39,13 @@ public class User implements UserDetails {
     @Column(unique = true, nullable = false)
     private String email;
 
+    // Never serialized to JSON - Trade (and now JournalDayResponse's embedded
+    // trades) carries a full User object with no DTO layer in between, so this
+    // is the one place that has to hold the line for every endpoint that ever
+    // returns a Trade, not just the ones written carefully. Jackson respects
+    // this; Spring Security's own use of getPassword() for authentication is
+    // a separate, unaffected code path.
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
