@@ -108,16 +108,19 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 
 ### Sprint 3.5 — Day-Scoped Journal Rework
 
-**Backend**
+**Backend (COMPLETE — reviewed & smoke-tested against a live server)**
 
-- [ ] `JournalEntry` entity — one row per `(user, entryDate)`: `notes` (day-level reflection), `htfBias`. Auto-created on first write (no explicit "create entry" step).
-- [ ] Rename `TradeAttachment` → `JournalAttachment`; repoint FK from `trade_id` to `journal_entry_id`. Remove the now-unneeded attachment cascade-delete logic from `TradeService.deleteTrade` (attachments no longer belong to a trade).
-- [ ] `GET/PUT /api/v1/journal/{date}` — day bundle (notes + HTF bias + that day's trades) / upsert notes+bias.
-- [ ] `POST /api/v1/journal/{date}/attachments`, `DELETE /api/v1/journal-attachments/{id}`.
-- [ ] `Trade.executionRating` (1-5) and `Trade.setupTags` (freeform, reusable string tags — `@ElementCollection`, not a separate Tag entity) — trade-level, since different trades in the same day can use different setups.
-- [ ] `PATCH /api/v1/trades/{id}` — first update endpoint for trades at all; edits `executionRating` and `setupTags`. `Trade.notes` (the original trade-entry field) is left as-is, distinct from the new day-level journal notes.
+- [x] `JournalEntry` entity — one row per `(user, entryDate)`: `notes` (day-level reflection), `htfBias`. Auto-created on first write only (a `GET` on an untouched day returns a clean empty bundle with no DB row).
+- [x] `TradeAttachment` → `JournalAttachment`; FK repointed from `trade_id` to `journal_entry_id`. Removed the now-unneeded attachment cascade-delete logic from `TradeService.deleteTrade`.
+- [x] `GET/PUT /api/v1/journal/{date}` — day bundle (notes + HTF bias + that day's trades) / upsert notes+bias.
+- [x] `POST /api/v1/journal/{date}/attachments`, `DELETE /api/v1/journal-attachments/{id}` (+ `GET .../file` for ownership-checked retrieval).
+- [x] `Trade.executionRating` (1-5) and `Trade.setupTags` (`@ElementCollection<String>`) — trade-level.
+- [x] `PATCH /api/v1/trades/{id}` — first update endpoint for trades at all; edits `executionRating` and `setupTags` only. `Trade.notes` (original trade-entry field) left as-is, distinct from day-level journal notes.
+- [x] **Bug found & fixed in review:** the day-range query for "trades on this date" used JPA's `Between` (inclusive both ends), so a trade logged at exactly midnight the next day would double-count into today's bundle too. Fixed with explicit `GreaterThanEqual`/`LessThan` bounds; verified live against a trade logged at exactly `T+1 00:00:00`.
+- [x] **Security bug found & fixed in review:** `Trade.user` embeds a full `User` object with no DTO in between, and `User.password` (the bcrypt hash) had no `@JsonIgnore` — so `GET /trades` *and* the new `GET /journal/{date}` were both leaking password hashes in every trade response. Fixed at the source (`@JsonIgnore` on `User.password`), protecting every current and future endpoint that ever serializes a `Trade`.
+- [x] 65 backend tests passing (7 new test classes covering `JournalEntry`, `JournalAttachment`, `JournalController` at repository/service/controller layers).
 
-**Frontend**
+**Frontend (not started)**
 
 - [ ] `AttachmentDropzone` gets a light/dark theme variant — the color bug seen on the first `/journal` pass (hardcoded dark styling rendering as a solid black box on light cards) gets fixed as part of this rework, not patched in isolation.
 - [ ] `/journal` reworked into a calendar-style browse view (reusing the dashboard calendar's look), replacing the flat card-list first pass.
