@@ -1,0 +1,6 @@
+target/
+storage/
+alphatracker-frontend/
+.git/
+.idea/
+*.log
