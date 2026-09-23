@@ -183,7 +183,11 @@ of these platforms without them):**
        `S3_ACCESS_KEY_ID` correctly fails the container at startup rather
        than booting into a broken storage adapter (confirms the no-default
        config choice in application.yml does what it's meant to).
-3. [ ] Stand up the database on Neon; point the backend at it.
+3. [x] Stood up the database on Neon (project `alphatracker`, `neondb`,
+       pooled connection, us-east-2). Live-tested: `mvnw spring-boot:run`
+       pointed at it via `DATABASE_URL`/`DATABASE_USERNAME`/`DATABASE_PASSWORD`
+       env vars, Hibernate auto-created the full schema on a fresh empty
+       database, register + log-trade + refetch round-tripped correctly.
 4. [ ] Deploy the backend container to Railway.
 5. [ ] Point the frontend at the live backend URL; deploy to Vercel.
 6. [ ] End-to-end smoke test against the live URLs (register, log a trade,
