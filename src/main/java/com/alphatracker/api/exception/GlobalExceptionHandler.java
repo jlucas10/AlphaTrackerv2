@@ -2,6 +2,8 @@ package com.alphatracker.api.exception;
 
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,6 +21,8 @@ import com.alphatracker.api.storage.StorageException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     // Bad input from the client: unsupported ticker, missing price, contracts < 1.
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
@@ -31,11 +35,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", ex.getMessage()));
     }
 
-    // Disk I/O failures underneath StorageService (or a corrupted storage key
-    // escaping its base path) are an infrastructure problem, not something the
-    // client did wrong - 500, unlike the two handlers above.
+    // Disk/S3 I/O failures underneath StorageService (or a corrupted storage
+    // key escaping its base path) are an infrastructure problem, not
+    // something the client did wrong - 500, unlike the two handlers above.
+    // Logged at ERROR with the full cause chain: the client only ever gets
+    // ex.getMessage() (deliberately, so internals like bucket names or file
+    // paths never leak into a response body), so without this log line a
+    // failure here is completely unobservable from the server side.
     @ExceptionHandler(StorageException.class)
     public ResponseEntity<Map<String, String>> handleStorage(StorageException ex) {
+        log.error("Storage operation failed: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", ex.getMessage()));
     }
 
