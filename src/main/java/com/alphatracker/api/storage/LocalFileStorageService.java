@@ -5,9 +5,9 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -16,8 +16,14 @@ import jakarta.annotation.PostConstruct;
 // {ownerId}/{uuid}{extension} - never the caller's original filename, so a
 // malicious filename (e.g. "../../etc/passwd") can never influence where a
 // file lands on disk. See StorageService for the interface contract this
-// fulfills; an S3 adapter will implement the same interface for Sprint 5.
+// fulfills; S3StorageService implements the same interface for production.
+//
+// matchIfMissing=true: local dev needs zero config to keep working exactly as
+// before. Production sets STORAGE_PROVIDER=s3, which both disables this bean
+// and activates S3StorageService - only one StorageService implementation is
+// ever active at a time, so nothing has to choose between them at call sites.
 @Service
+@ConditionalOnProperty(prefix = "application.storage", name = "provider", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorageService implements StorageService {
 
     @Value("${application.storage.local.base-path}")
@@ -37,7 +43,7 @@ public class LocalFileStorageService implements StorageService {
 
     @Override
     public StoredFile store(InputStream content, long sizeBytes, String originalFilename, String contentType, Long ownerId) {
-        String storageKey = ownerId + "/" + UUID.randomUUID() + extractExtension(originalFilename);
+        String storageKey = StorageKeys.generate(ownerId, originalFilename);
         Path target = resolveWithinBase(storageKey);
 
         try {
@@ -71,25 +77,6 @@ public class LocalFileStorageService implements StorageService {
         } catch (IOException e) {
             throw new StorageException("Failed to delete file for storage key: " + storageKey, e);
         }
-    }
-
-    // Keeps only a short, whitelisted extension from the caller-supplied
-    // filename. Everything else about the original filename is discarded -
-    // the on-disk name is always a fresh UUID, so this is purely cosmetic
-    // (keeps ".png"/".jpg" etc. on the file) and never trusted for pathing.
-    private String extractExtension(String originalFilename) {
-        if (originalFilename == null) {
-            return "";
-        }
-        int dot = originalFilename.lastIndexOf('.');
-        if (dot < 0 || dot == originalFilename.length() - 1) {
-            return "";
-        }
-        String ext = originalFilename.substring(dot + 1);
-        if (ext.length() > 10 || !ext.chars().allMatch(Character::isLetterOrDigit)) {
-            return "";
-        }
-        return "." + ext.toLowerCase();
     }
 
     // Defense in depth: even though this adapter generates every storageKey

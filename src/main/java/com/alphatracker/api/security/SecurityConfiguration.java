@@ -1,7 +1,9 @@
 package com.alphatracker.api.security;
 
+import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -25,6 +27,12 @@ public class SecurityConfiguration {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider; // Why: The engine that verifies user credentials
+
+    // Comma-separated origin patterns - see application.yml (application.cors.allowed-origins).
+    // Defaults to any localhost port for local dev; production sets this to
+    // the real Vercel origin via the CORS_ALLOWED_ORIGINS env var.
+    @Value("${application.cors.allowed-origins}")
+    private String allowedOriginPatterns;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -87,8 +95,9 @@ public class SecurityConfiguration {
 
         // Pattern rather than a fixed origin: Vite picks 5174, 5175... when 5173 is
         // already taken, and a hardcoded port breaks the moment that happens.
-        // DEV ONLY - narrow this to the real deployed origin before shipping.
-        config.setAllowedOriginPatterns(List.of("http://localhost:*"));
+        // Production narrows this to the real deployed frontend origin via the
+        // CORS_ALLOWED_ORIGINS env var (see application.yml) - never committed here.
+        config.setAllowedOriginPatterns(Arrays.asList(allowedOriginPatterns.split(",")));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));

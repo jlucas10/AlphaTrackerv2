@@ -131,24 +131,74 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - [x] `AttachmentLightbox` — click a thumbnail to view full-size, reusing the already-fetched blob (no extra request). Native pinch/`Cmd+/-` zoom works on it; a custom in-app zoom control was considered and deliberately skipped.
 - [x] Click-outside-to-close on `CreateAccountModal` and `TradeEntryModal`, matching the pattern already used by `DayDetailModal`/`JournalDayPanel`.
 
-### Backlog — Accounts Lifecycle & Management Page (not scheduled)
+### Sprint 4 — Production Deployment (Reprioritized ahead of Monetization)
 
-Raised while reviewing Sprint 3.5: the sidebar's "Accounts" button currently just pops `CreateAccountModal` directly — there's no page to browse, manage, or retire accounts. Requirements as discussed:
+**Why now, out of order:** a live link matters more for a resume than Stripe billing
+does. This also supersedes Sprint 5's original "Docker + AWS deployment
+(ECS/Fargate + RDS)" bullet with a lighter, cheaper stack better suited to a
+portfolio project's actual traffic — ECS/Fargate/RDS remains a valid future
+upgrade if this ever needs to scale, just not the starting point.
 
-- See all accounts created, grouped (Eval / Funded / Failed).
-- Delete an account.
-- Mark an evaluation account **Passed**, prompting "make your funded account now" — this should create a _new_, separate `Account` row (eval and funded accounts have different starting balances/drawdown rules at most firms), not mutate the eval account's `accountType` in place, so each phase's trades/stats stay cleanly separated by `account_id` the way they already do.
-- Mark an account **Failed** (blew the drawdown, dropped below the buffer, etc.).
+**Target stack:** Vercel (frontend) · Railway, ~$5/mo (backend, always-on — a
+resume link can't afford a 30-60s cold-start on Render's free tier) · Neon
+(managed Postgres, persistent free tier) · **AWS S3** (screenshot storage —
+chosen deliberately for the resume line, not because it's the cheapest option;
+realistic cost at this project's scale is a few cents/month, mitigated further
+by an AWS Budget alert).
 
-Design sketch for when this gets picked up:
+**Blockers that must be resolved first (not polish — the app cannot run on any
+of these platforms without them):**
 
-- `Account.status` enum (`ACTIVE` / `PASSED` / `FAILED`), replacing the current plain `active` boolean — "passed" and "failed" are both "inactive" but read very differently in the UI.
-- `Account.promotedToAccountId` — nullable, self-referencing FK, set when an eval is marked Passed and its funded account is created, so the UI can show the lineage ("this funded account came from Eval #1").
-- `DELETE /api/v1/accounts/{id}` — does not exist yet at all.
-- An endpoint to mark Passed + create the linked funded account in one step.
-- A real `/accounts` route/page on the frontend, replacing the sidebar's direct-to-modal shortcut (though "Create Account" would still live there as an action).
+- [x] **Environment-variable-based backend config.** `datasource.url/username/password`,
+      `application.security.jwt.secret-key`, `application.storage.local.base-path`, and
+      `application.cors.allowed-origins` are all `${VAR:local-dev-default}` now — local
+      dev behavior is unchanged, Railway will override all of them without touching this file.
+- [ ] **S3 `StorageService` adapter.** The only remaining hard blocker: local disk
+      (`storage.local.base-path`) does not survive a container restart/redeploy on
+      any of these platforms. This is the deferred Sprint 3 work, now required
+      rather than optional.
+- [ ] **Frontend API base URL.** `apiClient.ts`'s `baseURL` is hardcoded to
+      `http://localhost:8080/api/v1` - needs a build-time env var
+      (`VITE_API_BASE_URL`) so the Vercel build points at the deployed backend.
+- [x] **CORS origin now configurable** via `CORS_ALLOWED_ORIGINS` — mechanism is
+      done; the real value (Vercel's origin) gets set once that URL exists.
 
-### Sprint 4 — Monetization & Billing (Stripe Integration)
+**Sequencing:**
+
+1. [x] Dockerize the backend (multi-stage build: Maven build stage → slim JRE
+       runtime) + move config to env vars. Built and smoke-tested locally: the
+       image starts, connects via an env-var-overridden `DATABASE_URL` (proving
+       the override mechanism actually works, not just compiles), and a live
+       `POST /api/v1/auth/register` through the container round-tripped successfully.
+2. [x] Built `S3StorageService` (same key scheme/filename-sanitization as the
+       local adapter, extracted into a shared `StorageKeys` helper), toggled via
+       `STORAGE_PROVIDER` (`local` default / `s3`) so only one `StorageService`
+       bean is ever active — `@ConditionalOnProperty` on both adapters. 7 new
+       unit tests (mocked `S3Client`). Bucket + scoped IAM user + Budget alert
+       set up in the AWS console. **Live-tested twice against the real bucket**
+       (`alphatracker-attachments-josiah`, us-east-2) — once via `mvnw
+       spring-boot:run`, once through the actual Docker image (the real
+       deploy path): store → retrieve (byte-identical) → delete, through the
+       running app, not mocks. Caught one real bug in the process: a missing
+       `S3_ACCESS_KEY_ID` correctly fails the container at startup rather
+       than booting into a broken storage adapter (confirms the no-default
+       config choice in application.yml does what it's meant to).
+3. [x] Stood up the database on Neon (project `alphatracker`, `neondb`,
+       pooled connection, us-east-2). Live-tested: `mvnw spring-boot:run`
+       pointed at it via `DATABASE_URL`/`DATABASE_USERNAME`/`DATABASE_PASSWORD`
+       env vars, Hibernate auto-created the full schema on a fresh empty
+       database, register + log-trade + refetch round-tripped correctly.
+4. [ ] Deploy the backend container to Railway.
+5. [ ] Point the frontend at the live backend URL; deploy to Vercel.
+6. [ ] End-to-end smoke test against the live URLs (register, log a trade,
+       upload a screenshot, confirm it survives a backend redeploy).
+7. [ ] Add the live link to the README and resume.
+
+Keeping `ddl-auto: update` for schema management rather than introducing
+Flyway/Liquibase - reasonable for this project's scope, revisit only if a real
+migration history ever becomes necessary.
+
+### Sprint 5 — Monetization & Billing (Stripe Integration)
 
 - [ ] Stripe customer creation on user registration
 - [ ] Stripe Checkout session endpoint for subscription tiers (e.g. Free vs Pro Trader)
@@ -156,11 +206,10 @@ Design sketch for when this gets picked up:
 - [ ] Backend subscription tier security guardrails / access gates (e.g. max active accounts limit)
 - [ ] Frontend billing settings & subscription status badge
 
-### Sprint 5 / Update 1 — Analytics, Discipline Streaks & Cloud Deploy
+### Sprint 6 Analytics and Discipline Streaks
 
 - [ ] Real Discipline Score & Streaks engine
 - [ ] Peak-to-trough drawdown curve & session analytics (NY AM vs PM vs London)
-- [ ] Docker containerization & AWS deployment (ECS/Fargate + RDS PostgreSQL)
 
 ---
 

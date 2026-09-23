@@ -1,8 +1,13 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/alphatracker
-    username: josiahlucas
-    password: password
+    # ${VAR:default} - every one of these can be overridden by an environment
+    # variable without touching this file. The defaults after the colon are
+    # local-dev-only fallbacks, so `./mvnw spring-boot:run` keeps working with
+    # zero setup; Railway sets the real values as env vars (see CONTEXT.md,
+    # Sprint 3.75) and never touches this file.
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/alphatracker}
+    username: ${DATABASE_USERNAME:josiahlucas}
+    password: ${DATABASE_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -25,7 +30,33 @@ spring:
 application:
   security:
     jwt:
-      secret-key: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B59
+      # LOCAL DEV FALLBACK ONLY. This value is public (it's in the repo) - if
+      # a real deployment ever booted with this default, anyone could forge a
+      # valid JWT against it. JWT_SECRET_KEY MUST be set to a freshly
+      # generated secret on Railway before that deployment is trusted with
+      # anything real; see the Sprint 3.75 deploy checklist in CONTEXT.md.
+      secret-key: ${JWT_SECRET_KEY:404E635266556A586E3272357538782F413F4428472B4B6250645367566B59}
+  cors:
+    # Comma-separated origin patterns. Local dev matches any localhost port
+    # (Vite picks 5174, 5175... when 5173 is taken); production sets this to
+    # the real Vercel origin via env var - see SecurityConfiguration.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*}
   storage:
+    # "local" (default) or "s3" - selects which StorageService bean activates
+    # (see LocalFileStorageService / S3StorageService's @ConditionalOnProperty).
+    # Railway sets STORAGE_PROVIDER=s3; local dev never needs to touch this.
+    provider: ${STORAGE_PROVIDER:local}
     local:
-      base-path: ./storage/attachments
+      base-path: ${STORAGE_LOCAL_BASE_PATH:./storage/attachments}
+    s3:
+      # No default (no ":fallback" after the var name) is deliberate: these
+      # placeholders are only ever resolved when S3StorageService actually
+      # gets instantiated, i.e. only when provider=s3 - local dev (provider=
+      # local) never touches this bean, so these never get evaluated there.
+      # If provider=s3 is set without these configured, Spring fails fast at
+      # startup instead of quietly booting into a storage adapter that will
+      # 500 on the first upload.
+      bucket: ${S3_BUCKET}
+      region: ${S3_REGION}
+      access-key-id: ${S3_ACCESS_KEY_ID}
+      secret-access-key: ${S3_SECRET_ACCESS_KEY}
