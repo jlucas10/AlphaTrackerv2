@@ -1,8 +1,11 @@
 import axios from 'axios';
 
-// Create a specialized Axios instance pointing to Spring Boot server
+// VITE_API_BASE_URL is baked in at build time (Vite only exposes env vars
+// prefixed with VITE_ to client code - see vite.config.ts). Vercel sets this
+// to the live Railway backend URL; the fallback keeps `npm run dev` pointing
+// at localhost with zero setup, same pattern as the backend's own env vars.
 const apiClient = axios.create({
-    baseURL: 'http://localhost:8080/api/v1',
+    baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
