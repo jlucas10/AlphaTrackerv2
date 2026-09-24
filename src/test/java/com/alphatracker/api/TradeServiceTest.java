@@ -66,8 +66,8 @@ public class TradeServiceTest {
         Trade savedTrade = tradeService.logTrade(request, mockUser);
 
         assertNotNull(savedTrade);
-        assertEquals(68.16, savedTrade.getProfitLoss(), 0.001);
-        assertEquals(1.34, savedTrade.getCommission(), 0.001);
+        // 34.75 point move x $2 (MNQ) x 1 contract, no commission subtracted.
+        assertEquals(69.5, savedTrade.getProfitLoss(), 0.001);
         assertEquals("MNQ", savedTrade.getTicker());
         assertTrue(savedTrade.getFollowedPlan());
         assertNotNull(savedTrade.getTradeDate());
@@ -89,8 +89,8 @@ public class TradeServiceTest {
         Trade savedTrade = tradeService.logTrade(request, mockUser);
 
         assertNotNull(savedTrade);
-        assertEquals(1991.44, savedTrade.getProfitLoss(), 0.001);
-        assertEquals(8.56, savedTrade.getCommission(), 0.001);
+        // 50 point move (short, entry - exit) x $20 (NQ) x 2 contracts.
+        assertEquals(2000.00, savedTrade.getProfitLoss(), 0.001);
         assertEquals("NQ", savedTrade.getTicker());
     }
 
@@ -173,7 +173,7 @@ public class TradeServiceTest {
                 .ticker("MNQ")
                 .direction("LONG")
                 .entryPrice(20150.25)
-                .exitPrice(20185.00) // Net P/L = $68.16
+                .exitPrice(20185.00) // Net P/L = $69.50
                 .contracts(1)
                 .accountId(5L)
                 .build();
@@ -187,7 +187,7 @@ public class TradeServiceTest {
         // Assert
         assertNotNull(result.getAccount());
         assertEquals(5L, result.getAccount().getId());
-        assertEquals(50068.16, mockAccount.getCurrentBalance(), 0.01);
+        assertEquals(50069.5, mockAccount.getCurrentBalance(), 0.01);
         verify(accountRepository, times(1)).save(mockAccount);
     }
 
@@ -250,7 +250,7 @@ public class TradeServiceTest {
                 .ticker("MNQ")
                 .direction("LONG")
                 .entryPrice(20150.25)
-                .exitPrice(20185.00) // Net P/L = $68.16
+                .exitPrice(20185.00) // Net P/L = $69.50
                 .contracts(1)
                 .build();
 
@@ -262,7 +262,7 @@ public class TradeServiceTest {
 
         assertNotNull(result.getAccount());
         assertEquals(7L, result.getAccount().getId());
-        assertEquals(50068.16, primaryAccount.getCurrentBalance(), 0.01);
+        assertEquals(50069.5, primaryAccount.getCurrentBalance(), 0.01);
         verify(accountRepository, times(1)).save(primaryAccount);
         // The trader never picked an account explicitly, so the ownership
         // lookup used for an explicit accountId must not run.

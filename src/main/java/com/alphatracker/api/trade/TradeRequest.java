@@ -15,7 +15,6 @@ import lombok.NoArgsConstructor;
 //                   and have save() quietly UPDATE that row. No id, no mass assignment.
 //   user          - taken from the JWT in the controller, never from the body.
 //   profitLoss    - derived server-side from the instrument's point value.
-//   commission    - derived server-side from the instrument's round-turn fee.
 @Data
 @Builder
 @NoArgsConstructor
