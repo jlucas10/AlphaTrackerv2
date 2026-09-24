@@ -177,7 +177,7 @@ of these platforms without them):**
        unit tests (mocked `S3Client`). Bucket + scoped IAM user + Budget alert
        set up in the AWS console. **Live-tested twice against the real bucket**
        (`alphatracker-attachments-josiah`, us-east-2) — once via `mvnw
-       spring-boot:run`, once through the actual Docker image (the real
+   spring-boot:run`, once through the actual Docker image (the real
        deploy path): store → retrieve (byte-identical) → delete, through the
        running app, not mocks. Caught one real bug in the process: a missing
        `S3_ACCESS_KEY_ID` correctly fails the container at startup rather
@@ -188,10 +188,22 @@ of these platforms without them):**
        pointed at it via `DATABASE_URL`/`DATABASE_USERNAME`/`DATABASE_PASSWORD`
        env vars, Hibernate auto-created the full schema on a fresh empty
        database, register + log-trade + refetch round-tripped correctly.
-4. [ ] Deploy the backend container to Railway.
+4. [x] Deployed the backend container to Railway (`alphatrackerv2-production.up.railway.app`),
+       9 env vars set (DB, storage, JWT secret, provider), building straight
+       from the repo's `Dockerfile`. **Two real bugs found and fixed getting
+       here:**
+   - `GlobalExceptionHandler` converted every exception straight into a
+     client-facing JSON message and never logged the original error
+     server-side — a 500 on Railway was completely unobservable. Added
+     `log.error(..., ex)` to the `StorageException` handler (the one that
+     actually needed it to debug this).
+   - `S3_BUCKET` had literal quote characters in the Railway variable
+     value (`"alphatracker-attachments-josiah"` instead of
+     `alphatracker-attachments-josiah`) — copied from a terminal `export`
+     example where the quotes were bash syntax, not part of the value.
 5. [ ] Point the frontend at the live backend URL; deploy to Vercel.
-6. [ ] End-to-end smoke test against the live URLs (register, log a trade,
-       upload a screenshot, confirm it survives a backend redeploy).
+6. [ ] Confirm a screenshot survives a Railway redeploy (proves S3 persistence
+       beats the old local-disk problem this whole sprint exists to fix).
 7. [ ] Add the live link to the README and resume.
 
 Keeping `ddl-auto: update` for schema management rather than introducing
