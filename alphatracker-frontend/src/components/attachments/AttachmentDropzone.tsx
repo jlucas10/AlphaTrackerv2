@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { ALLOWED_ATTACHMENT_CONTENT_TYPES, MAX_ATTACHMENT_SIZE_BYTES } from '../../types/Attachment';
 
 interface AttachmentDropzoneProps {
@@ -9,6 +9,15 @@ interface AttachmentDropzoneProps {
   // hardcoded dark styling and rendered as a solid black box on light cards
   // (the bug seen on the first /journal pass).
   theme?: 'dark' | 'light';
+}
+
+// Exposed via ref so a parent modal/panel can feed it pasted files from a
+// document-wide paste listener (see usePasteScreenshot) - Cmd+V works
+// anywhere in the open modal that way, not just while this specific box has
+// focus, while still reusing this component's one validation + error-display
+// path instead of duplicating it.
+export interface AttachmentDropzoneHandle {
+  acceptFiles: (files: File[]) => void;
 }
 
 function validate(file: File): string | null {
@@ -26,11 +35,8 @@ function validate(file: File): string | null {
 // no tradeId yet during creation); the Journal view uploads immediately since
 // its trade already exists. Keeping this component upload-agnostic lets both
 // screens reuse it without forcing one flow onto the other.
-export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({
-  onFilesSelected,
-  disabled,
-  theme = 'dark',
-}) => {
+export const AttachmentDropzone = forwardRef<AttachmentDropzoneHandle, AttachmentDropzoneProps>(
+  ({ onFilesSelected, disabled, theme = 'dark' }, ref) => {
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,23 +57,13 @@ export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({
     [onFilesSelected],
   );
 
+  useImperativeHandle(ref, () => ({ acceptFiles }), [acceptFiles]);
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     if (disabled) return;
     if (e.dataTransfer.files?.length) acceptFiles(e.dataTransfer.files);
-  };
-
-  // Clipboard paste (Cmd+V) - the most common path for a screenshot tool.
-  // Scoped to this element via onPaste rather than a window listener, so
-  // pasting into an unrelated text field elsewhere on the page never triggers it.
-  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
-    if (disabled) return;
-    const files = Array.from(e.clipboardData.items)
-      .filter((item) => item.kind === 'file')
-      .map((item) => item.getAsFile())
-      .filter((f): f is File => f !== null);
-    if (files.length > 0) acceptFiles(files);
   };
 
   const isDark = theme === 'dark';
@@ -89,7 +85,6 @@ export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        onPaste={handlePaste}
         onClick={() => !disabled && inputRef.current?.click()}
         className={`cursor-pointer border-2 border-dashed rounded-lg px-4 py-6 text-center transition ${
           isDragging ? draggingClasses : idleClasses
@@ -119,4 +114,7 @@ export const AttachmentDropzone: React.FC<AttachmentDropzoneProps> = ({
       )}
     </div>
   );
-};
+  },
+);
+
+AttachmentDropzone.displayName = 'AttachmentDropzone';

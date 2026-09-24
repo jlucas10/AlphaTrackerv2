@@ -1,14 +1,17 @@
 # AlphaTracker
 
+**Live:** [alpha-tracker-journal.vercel.app](https://alpha-tracker-journal.vercel.app) — register a free account, no seed data needed.
+
 A trading journal built specifically for **prop-firm futures traders** — not a generic
 brokerage tracker. AlphaTracker understands firm rules (profit targets, trailing
 drawdown), derives contract economics server-side so a trader never has to do the
 math themselves, and gives a trader a real place to reflect on a session: notes,
 chart screenshots, execution ratings, and setup tags, organized by trading day.
 
-> Built end-to-end (schema → API → UI) as a full-stack portfolio project. See
-> [`CONTEXT.md`](./CONTEXT.md) for the full engineering log — every sprint, every
-> design decision, and every bug found along the way.
+> Built end-to-end (schema → API → UI → deploy) as a full-stack portfolio project.
+> See [`CONTEXT.md`](./CONTEXT.md) for the full engineering log — every sprint, every
+> design decision, and every bug found along the way, including three caught live
+> during the production deploy itself.
 
 ---
 
@@ -61,6 +64,7 @@ nowhere for a mistake to hide and nothing for the trader to mistype.
 | Backend    | Java 21, Spring Boot, Spring Security (JWT), Spring Data JPA, PostgreSQL |
 | Frontend   | React 19, TypeScript, Vite, Tailwind CSS v4, React Router, Axios, Recharts, date-fns |
 | Testing    | JUnit 5, Mockito, `@DataJpaTest` / `@WebMvcTest` slice tests             |
+| Deploy     | Docker (multi-stage build), Railway (backend), Vercel (frontend), Neon (Postgres), AWS S3 (screenshot storage) |
 
 ## Architecture at a glance
 
@@ -171,15 +175,19 @@ At a glance:
 - ✅ Core trade logging, calendar visualization, JWT auth
 - ✅ Multi-account prop firm management + trailing drawdown engine
 - ✅ Day-scoped journal: notes, HTF bias, chart screenshots, per-trade ratings/tags
+- ✅ Deployed to production: Vercel + Railway + Neon + AWS S3 (see the note below)
 - 🔜 Stripe billing (subscription tiers)
-- 🔜 Discipline streaks, session analytics, Docker + AWS deployment
+- 🔜 Discipline streaks, session analytics
 
 ## A note on how this was built
 
 This project was built collaboratively with Claude Code, working through design
 decisions rather than accepting first-draft output: sequencing features deliberately
 (storage before the entities that use it), writing tests alongside every backend
-layer, and — notably — catching and fixing two real bugs during a self-review pass
-before they shipped: an inclusive date-range query that would have double-counted a
-trade logged at exactly midnight, and a password hash that was leaking in every trade
-API response. Both are documented in `CONTEXT.md` alongside the fix.
+layer, and catching real bugs before and during production deploy rather than after —
+an inclusive date-range query that would have double-counted a trade logged at exactly
+midnight, a password hash leaking in every trade API response, and — live, while
+standing up the Railway deployment — an exception handler that silently discarded the
+real error on every failure, found and fixed specifically because it was blocking
+debugging of an actual production issue. All of them are documented in `CONTEXT.md`
+alongside their fixes.

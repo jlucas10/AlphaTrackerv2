@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { useJournalDay } from '../../hooks/useJournalDay';
-import { AttachmentDropzone } from '../attachments/AttachmentDropzone';
+import { usePasteScreenshot } from '../../hooks/usePasteScreenshot';
+import { AttachmentDropzone, type AttachmentDropzoneHandle } from '../attachments/AttachmentDropzone';
 import { AttachmentThumbnail } from '../attachments/AttachmentThumbnail';
 import { JournalTradeCard } from './JournalTradeCard';
 
@@ -25,6 +26,12 @@ export const JournalDayPanel: React.FC<JournalDayPanelProps> = ({ date, onClose 
 
   const [uploadingCount, setUploadingCount] = useState(0);
   const [uploadError, setUploadError] = useState('');
+
+  // Lets Cmd+V paste a screenshot anywhere in this panel, not just while the
+  // small dropzone box has focus - see usePasteScreenshot. The panel is only
+  // ever mounted while open, so this can stay unconditionally enabled.
+  const dropzoneRef = useRef<AttachmentDropzoneHandle>(null);
+  usePasteScreenshot(dropzoneRef, true);
 
   // Reset the draft whenever the loaded day changes (including from '' while
   // loading to the real values once the fetch resolves), so typing in one
@@ -161,6 +168,7 @@ export const JournalDayPanel: React.FC<JournalDayPanelProps> = ({ date, onClose 
                   </div>
                 )}
                 <AttachmentDropzone
+                  ref={dropzoneRef}
                   theme="light"
                   disabled={uploadingCount > 0}
                   onFilesSelected={handleFilesSelected}

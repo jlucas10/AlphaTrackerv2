@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import apiClient from '../api/apiClient';
 import { deleteAttachment, uploadAttachment } from '../api/attachments';
+import { usePasteScreenshot } from '../hooks/usePasteScreenshot';
 import type { Account } from '../types/Account';
 import type { Attachment } from '../types/Attachment';
-import { AttachmentDropzone } from './attachments/AttachmentDropzone';
+import { AttachmentDropzone, type AttachmentDropzoneHandle } from './attachments/AttachmentDropzone';
 import { AttachmentThumbnail } from './attachments/AttachmentThumbnail';
 
 // Define imports and component interface
@@ -89,6 +90,13 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
         await deleteAttachment(id);
         setAttachments((prev) => prev.filter((a) => a.id !== id));
     };
+
+    // Lets Cmd+V paste a screenshot anywhere in the open modal (not just while
+    // the small dropzone box has focus) - see usePasteScreenshot. Has to run
+    // unconditionally (before the `if (!isOpen) return null` below) since it's
+    // a hook, but the `enabled: isOpen` argument keeps it inert while closed.
+    const dropzoneRef = useRef<AttachmentDropzoneHandle>(null);
+    usePasteScreenshot(dropzoneRef, isOpen);
 
     // The modal stays mounted while closed (the early return below renders null),
     // so state has to be cleared explicitly or the next open shows stale values.
@@ -338,7 +346,11 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                         <label className="block text-xs font-mono text-neutral-400 mb-1">
                             Chart Screenshots
                         </label>
-                        <AttachmentDropzone disabled={uploadingCount > 0} onFilesSelected={handleFilesSelected} />
+                        <AttachmentDropzone
+                            ref={dropzoneRef}
+                            disabled={uploadingCount > 0}
+                            onFilesSelected={handleFilesSelected}
+                        />
                         {uploadingCount > 0 && (
                             <p className="mt-2 text-xs font-mono text-neutral-500">Uploading...</p>
                         )}
