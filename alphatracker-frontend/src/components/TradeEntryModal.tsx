@@ -172,7 +172,7 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
             onClick={handleClose}
         >
             <div
-                className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-2xl"
+                className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-neutral-900 border border-neutral-800 rounded-xl p-6 shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
