@@ -201,10 +201,26 @@ of these platforms without them):**
      value (`"alphatracker-attachments-josiah"` instead of
      `alphatracker-attachments-josiah`) — copied from a terminal `export`
      example where the quotes were bash syntax, not part of the value.
-5. [ ] Point the frontend at the live backend URL; deploy to Vercel.
-6. [ ] Confirm a screenshot survives a Railway redeploy (proves S3 persistence
-       beats the old local-disk problem this whole sprint exists to fix).
+5. [x] `apiClient.ts` reads `VITE_API_BASE_URL` (baked in at build time, falls
+       back to localhost for `npm run dev`) — verified the built bundle
+       actually contains the right URL for both the set and unset cases
+       before ever deploying it. Deployed to Vercel
+       (`alpha-tracker-journal.vercel.app`), root directory set to
+       `alphatracker-frontend` for the monorepo. `CORS_ALLOWED_ORIGINS` set
+       on Railway to the real Vercel origin — verified the preflight
+       response flip from a bare 403 to a proper `access-control-allow-origin`
+       header before testing through the browser. Full manual click-through
+       (register, log a trade, upload a screenshot, view the journal)
+       confirmed working by hand.
+6. [x] **The actual point of this whole sprint, proven live:** uploaded a
+       screenshot to the deployed backend, triggered a full Railway
+       redeploy (container restarts from scratch), and confirmed the
+       screenshot was still retrievable afterward, byte-identical. This is
+       exactly what local disk storage could never have survived.
 7. [ ] Add the live link to the README and resume.
+
+**Live URLs:** frontend `https://alpha-tracker-journal.vercel.app` · backend
+`https://alphatrackerv2-production.up.railway.app`
 
 Keeping `ddl-auto: update` for schema management rather than introducing
 Flyway/Liquibase - reasonable for this project's scope, revisit only if a real
