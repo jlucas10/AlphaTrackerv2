@@ -61,7 +61,7 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full p-6 shadow-2xl"
+        className="bg-neutral-900 border border-neutral-800 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
