@@ -127,8 +127,8 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     setError('');
     setLoading(true);
 
-    // Keys match TradeRequest exactly. No commission and no profitLoss: both are
-    // derived server-side from the instrument's point value and round-turn fee.
+    // Keys match TradeRequest exactly. No profitLoss: it's derived server-side
+    // from the instrument's point value (no commission modeled - see Instrument.java).
     const payload = {
       ticker,
       direction,

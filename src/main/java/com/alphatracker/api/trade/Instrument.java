@@ -2,49 +2,44 @@ package com.alphatracker.api.trade;
 
 // The single source of truth for futures contract economics.
 //
-// The trader never types a dollar multiplier or a commission — they pick the
-// contract they actually traded and the server derives the money from it.
-// A 10-point move on MNQ is $20; the same move on NQ is $200. That difference
-// belongs here, not in the UI and not in the trader's head.
+// The trader never types a dollar multiplier — they pick the contract they
+// actually traded and the server derives the money from it. A 10-point move
+// on MNQ is $20; the same move on NQ is $200. That difference belongs here,
+// not in the UI and not in the trader's head.
 //
-// pointValue    : dollars of P/L per 1.00 of price movement, per contract (CME contract spec)
-// roundTurnFee  : all-in commission for one entry + one exit, per contract
+// pointValue : dollars of P/L per 1.00 of price movement, per contract (CME contract spec)
 //
-// The point values are fixed by the exchange. The fees are prop-firm defaults
-// (Tradovate/Apex-style rates) — tune these to your own firm's published
-// schedule and every historical calculation stays consistent.
+// No commission/round-turn fee is modeled: most prop firms don't pass
+// per-trade commissions on to the trader the way a retail broker does, and
+// showing one made the P/L number read as "weird" rather than the clean
+// figure a trader would actually see from their firm (e.g. a 50-point MNQ
+// move on 5 contracts should read as exactly $500, not $500 minus some fee).
 public enum Instrument {
 
     // ---- Equity index ----
-    ES(50.0, 4.28),    // E-mini S&P 500
-    MES(5.0, 1.34),    // Micro E-mini S&P 500
-    NQ(20.0, 4.28),    // E-mini Nasdaq-100
-    MNQ(2.0, 1.34),    // Micro E-mini Nasdaq-100
-    YM(5.0, 4.28),     // E-mini Dow
-    MYM(0.5, 1.34),    // Micro E-mini Dow
-    RTY(50.0, 4.28),   // E-mini Russell 2000
-    M2K(5.0, 1.34),    // Micro E-mini Russell 2000
+    ES(50.0),    // E-mini S&P 500
+    MES(5.0),    // Micro E-mini S&P 500
+    NQ(20.0),    // E-mini Nasdaq-100
+    MNQ(2.0),    // Micro E-mini Nasdaq-100
+    YM(5.0),     // E-mini Dow
+    MYM(0.5),    // Micro E-mini Dow
+    RTY(50.0),   // E-mini Russell 2000
+    M2K(5.0),    // Micro E-mini Russell 2000
 
     // ---- Energy / metals ----
-    CL(1000.0, 4.28),  // Crude Oil
-    MCL(100.0, 1.34),  // Micro Crude Oil
-    GC(100.0, 4.28),   // Gold
-    MGC(10.0, 1.34);   // Micro Gold
+    CL(1000.0),  // Crude Oil
+    MCL(100.0),  // Micro Crude Oil
+    GC(100.0),   // Gold
+    MGC(10.0);   // Micro Gold
 
     private final double pointValue;
-    private final double roundTurnFee;
 
-    Instrument(double pointValue, double roundTurnFee) {
+    Instrument(double pointValue) {
         this.pointValue = pointValue;
-        this.roundTurnFee = roundTurnFee;
     }
 
     public double getPointValue() {
         return pointValue;
-    }
-
-    public double getRoundTurnFee() {
-        return roundTurnFee;
     }
 
     // Resolves a user-typed ticker ("mnq", " NQ ") to a known contract.

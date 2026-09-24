@@ -5,10 +5,9 @@ export interface Trade {
   entryPrice: number;
   exitPrice: number;
   contracts: number;
-  profitLoss: number; // net of commission, derived server-side
-  // Added by the backend TradeRequest work. Optional because trades logged
-  // before those columns existed come back with null.
-  commission?: number | null;
+  // Point move x instrument's point value x contracts, derived server-side.
+  // No commission modeled - see Instrument.java for why.
+  profitLoss: number;
   followedPlan?: boolean | null;
   notes: string | null;
   tradeDate: string;

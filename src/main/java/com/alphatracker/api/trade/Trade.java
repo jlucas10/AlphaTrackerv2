@@ -51,15 +51,10 @@ public class Trade {
     @Column(nullable = false)
     private Integer contracts; // num of lots
 
+    // Gross move x point value x contracts, no commission subtracted - see
+    // Instrument for why. This is the number that hits the account.
     @Column(nullable = false)
-    private Double profitLoss; // Net PNL: gross move minus commission
-
-    // Derived server-side from the Instrument's round-turn fee x contracts.
-    // Stored rather than recomputed so a later change to the fee schedule
-    // never silently rewrites the P/L history of trades already logged.
-    // Nullable: ddl-auto=update cannot add a NOT NULL column to a table that
-    // already holds rows.
-    private Double commission;
+    private Double profitLoss;
 
     // Discipline flag - feeds the Discipline Score on the dashboard.
     private Boolean followedPlan;

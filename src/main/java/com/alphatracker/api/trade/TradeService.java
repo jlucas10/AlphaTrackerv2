@@ -42,8 +42,9 @@ public class TradeService {
                 : entryPrice - exitPrice;
 
         double gross = priceMove * instrument.getPointValue() * contracts;
-        double commission = instrument.getRoundTurnFee() * contracts;
-        double netProfitLoss = round(gross - commission);
+        // No commission subtracted - see Instrument for why. A 50-point move
+        // on 5 MNQ contracts is exactly $500, the number a trader expects.
+        double netProfitLoss = round(gross);
 
         // Sprint 2: Link to Account if accountId is passed
         Account targetAccount = null;
@@ -72,7 +73,6 @@ public class TradeService {
                 .entryPrice(entryPrice)
                 .exitPrice(exitPrice)
                 .contracts(contracts)
-                .commission(round(commission))
                 .profitLoss(netProfitLoss) // net is what hits the account
                 .followedPlan(request.getFollowedPlan() == null || request.getFollowedPlan())
                 .notes(request.getNotes())
