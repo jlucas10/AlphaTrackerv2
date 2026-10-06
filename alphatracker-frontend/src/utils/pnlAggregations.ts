@@ -1,5 +1,6 @@
 import { format, parseISO, compareAsc } from 'date-fns';
 import type { Trade } from '../types/Trade';
+import { classifyPnl, sumPnl } from './tradeOutcome';
 
 export interface EquityPoint {
   date: string;
@@ -9,10 +10,21 @@ export interface EquityPoint {
 const DAY_KEY_FORMAT = 'yyyy-MM-dd';
 
 export function groupTradesByDay(trades: Trade[]): Map<string, number> {
-  const dayTotals = new Map<string, number>();
+  const dayPnls = new Map<string, number[]>();
   for (const trade of trades) {
     const key = format(parseISO(trade.tradeDate), DAY_KEY_FORMAT);
-    dayTotals.set(key, (dayTotals.get(key) ?? 0) + trade.profitLoss);
+    const existing = dayPnls.get(key);
+    if (existing) {
+      existing.push(trade.profitLoss);
+    } else {
+      dayPnls.set(key, [trade.profitLoss]);
+    }
+  }
+  // Summed in whole cents (sumPnl) so offsetting trades land on exactly 0 - a
+  // neutral day - instead of float noise that would colour it as a win day.
+  const dayTotals = new Map<string, number>();
+  for (const [key, pnls] of dayPnls) {
+    dayTotals.set(key, sumPnl(pnls));
   }
   return dayTotals;
 }
@@ -45,30 +57,52 @@ export function getTradesForDay(dayTrades: Map<string, Trade[]>, day: Date): Tra
 
 export function getMonthlyTotal(dayTotals: Map<string, number>, monthDate: Date): number {
   const monthPrefix = format(monthDate, 'yyyy-MM');
-  let total = 0;
+  const monthPnls: number[] = [];
   for (const [key, pnl] of dayTotals) {
     if (key.startsWith(monthPrefix)) {
-      total += pnl;
+      monthPnls.push(pnl);
     }
   }
-  return total;
+  return sumPnl(monthPnls);
 }
 
-export function computeWinRate(trades: Trade[]): { winRate: number; totalTrades: number } {
-  const totalTrades = trades.length;
-  if (totalTrades === 0) {
-    return { winRate: 0, totalTrades: 0 };
+export interface WinRateStats {
+  // 0-100, rounded. wins / (wins + losses): neutral trades are NOT in the
+  // denominator (see tradeOutcome.ts). 0 when nothing was decided - check
+  // decidedTrades before presenting it as a real "0%".
+  winRate: number;
+  totalTrades: number;   // every trade, neutral included
+  decidedTrades: number; // wins + losses
+  neutralTrades: number; // exactly 0 - shown to the user, never hidden
+}
+
+export function computeWinRate(trades: Trade[]): WinRateStats {
+  let wins = 0;
+  let losses = 0;
+  let neutralTrades = 0;
+  for (const t of trades) {
+    const outcome = classifyPnl(t.profitLoss);
+    if (outcome === 'win') wins++;
+    else if (outcome === 'loss') losses++;
+    else neutralTrades++;
   }
-  const wins = trades.filter((t) => t.profitLoss > 0).length;
-  return { winRate: Math.round((wins / totalTrades) * 100), totalTrades };
+  const decidedTrades = wins + losses;
+  return {
+    winRate: decidedTrades === 0 ? 0 : Math.round((wins / decidedTrades) * 100),
+    totalTrades: trades.length,
+    decidedTrades,
+    neutralTrades,
+  };
 }
 
-export function computeAvgWinLoss(trades: Trade[]): { avgWin: number; avgLoss: number } {
-  const wins = trades.filter((t) => t.profitLoss > 0).map((t) => t.profitLoss);
-  const losses = trades.filter((t) => t.profitLoss < 0).map((t) => t.profitLoss);
+// null (not 0) when there are no wins / no losses: "no data" must not read as
+// "$0 average loss".
+export function computeAvgWinLoss(trades: Trade[]): { avgWin: number | null; avgLoss: number | null } {
+  const wins = trades.filter((t) => classifyPnl(t.profitLoss) === 'win').map((t) => t.profitLoss);
+  const losses = trades.filter((t) => classifyPnl(t.profitLoss) === 'loss').map((t) => t.profitLoss);
 
-  const avgWin = wins.length === 0 ? 0 : wins.reduce((sum, v) => sum + v, 0) / wins.length;
-  const avgLoss = losses.length === 0 ? 0 : losses.reduce((sum, v) => sum + v, 0) / losses.length;
+  const avgWin = wins.length === 0 ? null : sumPnl(wins) / wins.length;
+  const avgLoss = losses.length === 0 ? null : sumPnl(losses) / losses.length;
 
   return { avgWin, avgLoss };
 }

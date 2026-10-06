@@ -46,7 +46,7 @@ const DashboardView: React.FC = () => {
     ? selectedAccount.currentBalance
     : totalCumulativePnl;
 
-  const { winRate, totalTrades } = computeWinRate(trades);
+  const { winRate, totalTrades, decidedTrades, neutralTrades } = computeWinRate(trades);
   const { avgWin, avgLoss } = computeAvgWinLoss(trades);
 
   const primaryAccount = accounts.find((a) => a.isPrimary) ?? null;
@@ -141,19 +141,30 @@ const DashboardView: React.FC = () => {
           {/* Win Rate Ring Card */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs flex flex-col items-center justify-between h-64 text-center">
             <p className="w-full text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Win Rate %</p>
-            <WinRateRing winRate={winRate} totalTrades={totalTrades} />
+            <WinRateRing winRate={winRate} decidedTrades={decidedTrades} />
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Trades: {totalTrades}</p>
+            {/* Neutral (exactly $0) trades are excluded from the win rate but
+                never hidden - lots of them means profit is being given up. */}
+            {neutralTrades > 0 && (
+              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+                {neutralTrades} neutral ($0)
+              </p>
+            )}
           </div>
 
           {/* Average Win / Loss Metrics Card */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs flex flex-col justify-between h-64">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg Win</p>
-              <p className="text-2xl font-black text-emerald-500 mt-1">${avgWin.toFixed(0)}</p>
+              <p className="text-2xl font-black text-emerald-500 mt-1">
+                {avgWin === null ? '—' : `$${avgWin.toFixed(0)}`}
+              </p>
             </div>
             <div className="border-t border-gray-100 pt-4">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Avg Loss</p>
-              <p className="text-2xl font-black text-red-500 mt-1">-${Math.abs(avgLoss).toFixed(0)}</p>
+              <p className="text-2xl font-black text-red-500 mt-1">
+                {avgLoss === null ? '—' : `-$${Math.abs(avgLoss).toFixed(0)}`}
+              </p>
             </div>
           </div>
 

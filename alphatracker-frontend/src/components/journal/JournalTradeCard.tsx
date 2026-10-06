@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { Trade } from '../../types/Trade';
 import { formatUsd } from '../../utils/formatters';
+import { classifyPnl } from '../../utils/tradeOutcome';
 import { updateTrade } from '../../api/trades';
 import { TagInput } from './TagInput';
 
@@ -18,7 +19,7 @@ interface JournalTradeCardProps {
 // TradeUpdateRequest on the backend for why those stay immutable after creation.
 export const JournalTradeCard: React.FC<JournalTradeCardProps> = ({ trade, allTagsToday, onUpdated }) => {
   const [saving, setSaving] = useState(false);
-  const isWin = trade.profitLoss > 0;
+  const outcome = classifyPnl(trade.profitLoss);
   const isLong = trade.direction?.toUpperCase() === 'LONG';
 
   const saveRating = async (rating: number) => {
@@ -60,7 +61,11 @@ export const JournalTradeCard: React.FC<JournalTradeCardProps> = ({ trade, allTa
             {format(parseISO(trade.tradeDate), 'h:mm a')}
           </span>
         </div>
-        <span className={`text-xs font-black tabular-nums ${isWin ? 'text-emerald-600' : 'text-red-600'}`}>
+        <span
+          className={`text-xs font-black tabular-nums ${
+            outcome === 'win' ? 'text-emerald-600' : outcome === 'loss' ? 'text-red-600' : 'text-gray-500'
+          }`}
+        >
           {formatUsd(trade.profitLoss)}
         </span>
       </div>

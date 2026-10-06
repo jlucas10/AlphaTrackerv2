@@ -1,8 +1,8 @@
 import React from 'react';
 
 interface WinRateRingProps {
-  winRate: number;    // 0-100
-  totalTrades: number;
+  winRate: number;       // 0-100
+  decidedTrades: number; // wins + losses; neutral (0) trades don't count toward the rate
 }
 
 // Geometry for the donut. The arc length of a circle is 2*PI*r, so setting
@@ -14,11 +14,13 @@ const STROKE = 10;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const WinRateRing: React.FC<WinRateRingProps> = ({ winRate, totalTrades }) => {
+const WinRateRing: React.FC<WinRateRingProps> = ({ winRate, decidedTrades }) => {
   // Guard the geometry against bad input: a NaN or out-of-range value would
   // produce an invalid dash array and silently render nothing.
   const safeRate = Number.isFinite(winRate) ? Math.min(100, Math.max(0, winRate)) : 0;
-  const hasTrades = totalTrades > 0;
+  // Keyed on decided trades, not all trades: an account whose only trades are
+  // neutral has no win rate yet, and must not render as a red "0%".
+  const hasTrades = decidedTrades > 0;
 
   const progress = (safeRate / 100) * CIRCUMFERENCE;
 

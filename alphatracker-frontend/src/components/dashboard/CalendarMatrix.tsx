@@ -69,10 +69,10 @@ const CalendarMatrix: React.FC<CalendarMatrixProps> = ({ trades, onDeleteTrade }
         </div>
         <p
           className={`text-xs font-bold uppercase tracking-wider ${
-            monthlyTotal >= 0 ? 'text-emerald-500' : 'text-red-500'
+            monthlyTotal > 0 ? 'text-emerald-500' : monthlyTotal < 0 ? 'text-red-500' : 'text-gray-400'
           }`}
         >
-          Monthly P/L: {monthlyTotal >= 0 ? '+' : '-'}${Math.abs(monthlyTotal).toFixed(0)}
+          Monthly P/L: {monthlyTotal > 0 ? '+' : monthlyTotal < 0 ? '-' : ''}${Math.abs(monthlyTotal).toFixed(0)}
         </p>
       </div>
 

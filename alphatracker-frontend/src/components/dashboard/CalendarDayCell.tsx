@@ -1,5 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
+import { classifyPnl } from '../../utils/tradeOutcome';
 
 interface CalendarDayCellProps {
   day: Date;
@@ -22,12 +23,21 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   onSelect,
   alwaysInteractive = false,
 }) => {
+  // A day with trades that nets to exactly 0 is a NEUTRAL day, which is not
+  // the same as a day with no trades: both have pnl 0, so tradeCount is what
+  // tells them apart. Neutral days get their own tint (not a win, not a loss,
+  // not empty) because lots of them means profit is being given up.
+  const outcome = classifyPnl(pnl);
+  const isNeutralDay = inCurrentMonth && tradeCount > 0 && outcome === 'neutral';
+
   const colorClass = !inCurrentMonth
     ? 'bg-gray-50 text-gray-300'
-    : pnl > 0
+    : outcome === 'win'
     ? 'bg-emerald-50 text-emerald-700'
-    : pnl < 0
+    : outcome === 'loss'
     ? 'bg-red-50 text-red-700'
+    : isNeutralDay
+    ? 'bg-amber-50 text-amber-700'
     : 'bg-gray-50 text-gray-500';
 
   const isInteractive = inCurrentMonth && (alwaysInteractive || tradeCount > 0);
@@ -59,11 +69,12 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {tradeCount > 0 && <span className="text-[9px] font-bold opacity-60">{tradeCount}</span>}
       </div>
 
-      {inCurrentMonth && pnl !== 0 && (
+      {inCurrentMonth && outcome !== 'neutral' && (
         <span className="text-xs font-bold mt-auto">
           {pnl > 0 ? '+' : '-'}${Math.abs(pnl).toFixed(0)}
         </span>
       )}
+      {isNeutralDay && <span className="text-xs font-bold mt-auto">$0</span>}
     </button>
   );
 };

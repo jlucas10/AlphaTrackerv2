@@ -269,9 +269,9 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
       Filters: `?accountId=&from=&to=` (dates inclusive). A non-owned `accountId` is a 403.
 - [x] `GET /api/v1/journal?from=&to=` — `{date, notes, htfBias}` rows, both dates inclusive and required,
       max 366 days, empty (screenshot-only) days omitted
-- [ ] Follow-up (separate PR, before the chat panel): align frontend `computeWinRate` / `computeAvgWinLoss` /
-      calendar day colouring with the win / loss / neutral rule (frontend still treats `> 0` as the only win
-      and has no neutral concept)
+- [x] Frontend aligned with the win / loss / neutral rule: shared `utils/tradeOutcome.ts` (`classifyPnl`,
+      cents-exact `sumPnl`), win rate excludes neutral from its denominator, neutral trades/days shown (amber
+      calendar tint, "$0", "N neutral" under the ring), averages are `—` instead of `$0` when there's no data.
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
