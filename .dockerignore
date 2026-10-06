@@ -1,6 +1,7 @@
 target/
 storage/
 alphatracker-frontend/
+alphatracker-assistant/
 .git/
 .idea/
 *.log

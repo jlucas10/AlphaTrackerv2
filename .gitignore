@@ -36,3 +36,15 @@ build/
 
 ### Node Modules ###
 node_modules/
+
+### Secrets - never commit. .env.example (names only, no values) IS committed. ###
+.env
+.env.local
+
+### Python (alphatracker-assistant) ###
+.venv/
+*.egg-info/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
