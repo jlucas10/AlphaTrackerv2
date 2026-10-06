@@ -273,6 +273,62 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
       cents-exact `sumPnl`), win rate excludes neutral from its denominator, neutral trades/days shown (amber
       calendar tint, "$0", "N neutral" under the ring), averages are `—` instead of `$0` when there's no data.
 
+#### Phase 2 — Python assistant service (`/alphatracker-assistant`) — IN PROGRESS
+
+**Decided:**
+
+- Frontend calls the Python service **directly** with the user's JWT; Python forwards it unchanged to Spring
+  and never validates JWTs itself (Spring does). Needs CORS on the Python side.
+- **Stateless:** the client sends the last N turns of `history`; Python stores nothing and never touches the DB.
+- No streaming in Phase 2 (easy to add for the Phase 4 chat panel).
+- Gemini model ID comes from `GEMINI_MODEL` (flash-class for tool calling; **not chosen yet** — verify the
+  current SDK/model IDs at step 4). Eval set (Phase 3) can compare models.
+- Config is env-only: `GEMINI_API_KEY`, `GEMINI_MODEL`, `SPRING_API_BASE_URL`, `TIMEZONE` (default
+  `America/Los_Angeles`, defines "today" — **confirm**), `CORS_ALLOWED_ORIGINS`. Locally these live in
+  `alphatracker-assistant/.env` (git-ignored; no `.env.example` by choice); on Railway they are service variables.
+  Blank values count as unset. The Gemini key is never pasted into chat or logged.
+
+**Design:**
+
+- **Tools** (each a read-only GET): `list_accounts` (so "my Apex account" resolves to an id; also surfaces
+  balances/drawdown), `get_summary`, `get_breakdown(by=instrument|setup|rating)`, `get_discipline`,
+  `get_journal_entries`.
+- **Period handling:** tools take a `period` enum (`today`, `this_week`, `last_week`, `this_month`, `last_month`,
+  `last_30_days`, `all_time`) resolved **deterministically in Python**, or explicit `from`/`to`. The model never
+  does date arithmetic.
+- **Tool loop (hand-written):** preflight `GET /accounts` (validates the JWT before spending a Gemini call, and
+  preloads the account list) → call model with tool schemas → run requested tools → append results → repeat;
+  stop on plain text or after 6 iterations. Tool errors (400/403 with a JSON `message`) go back to the model as
+  structured errors; an auth failure ends the request with a 401.
+- **Two kinds of 403 from Spring:** empty body = unauthenticated/expired token (stop, tell the user to log in);
+  JSON `message` = ownership error (return to the model to explain).
+- **Safety:** GET-only client with a path allowlist; Pydantic-validated tool args; response size cap with a
+  truncation flag; JWT never in logs, traces, or error text; same tool call repeated in one loop is cut off.
+- **`POST /chat`:** request `{message, history[]}` with `Authorization: Bearer`; response
+  `{answer, tool_calls:[{name,args,status}]}` (the trace is for debugging, a future "show sources", and eval scoring).
+- **System prompt rules:** use only tool-returned numbers; win/loss/neutral as defined above; high neutral
+  rate/days is a red flag; setup counts overlap; `null` means "no data", not zero; warn on small samples; no
+  financial advice; say plainly what it cannot answer (e.g. loss-streak questions — that stat was dropped).
+- Trading notes are sent to Google's API: fine for a single-user tool, needs a consent decision before other
+  users or Stripe tiers exist. Sprint 5 may gate the assistant as a Pro feature.
+
+**Checklist (one numbered item at a time, review after each):**
+
+- [x] 1. Scaffold: layout, config, `GET /health`, Dockerfile, README, CORS, `.env` git-ignored, 3 pytest tests
+- [ ] 2. `SpringClient` (GET-only, JWT forwarding, allowlist, 403 mapping) + ~4 tests
+- [ ] 3. Tools, argument validation, `periods` resolver + ~3 tests
+- [ ] 4. LLM interface, Gemini adapter, fake LLM for tests (pick `GEMINI_MODEL`, add `google-genai`)
+- [ ] 5. Agent loop + system prompt + ~5 tests (fake LLM, no real model in unit tests)
+- [ ] 6. `/chat` wiring, preflight, error handling + manual end-to-end run against local Spring with a real key
+- Target ~14 pytest tests for the whole phase.
+
+**Open questions:** `GEMINI_MODEL`; confirm `TIMEZONE`; dashboard Discipline Score counts legacy `followedPlan = null`
+trades as "not followed" while `/analytics/discipline` reports them as "unspecified" — align or leave?
+
+**Later phases (context only):** Phase 3 — 50-question eval set scored against these endpoints (include
+unanswerable questions; consider checking that every number in an answer appears in a tool result). Phase 4 —
+pgvector search over journal notes. Phase 5 — React chat panel.
+
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
 Raised while reviewing Sprint 3.5: the sidebar's "Accounts" button currently just pops `CreateAccountModal` directly — there's no page to browse, manage, or retire accounts. Requirements as discussed:
