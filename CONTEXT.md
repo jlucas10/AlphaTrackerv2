@@ -267,7 +267,8 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
 - [x] `GET /api/v1/analytics/summary` (trade stats + day stats), `/breakdown?by=instrument|setup|rating`,
       `/discipline` (`followedPlan` split). Loss-streak stat dropped — not relevant to a discipline journal.
       Filters: `?accountId=&from=&to=` (dates inclusive). A non-owned `accountId` is a 403.
-- [ ] `GET /api/v1/journal?from=&to=`
+- [x] `GET /api/v1/journal?from=&to=` — `{date, notes, htfBias}` rows, both dates inclusive and required,
+      max 366 days, empty (screenshot-only) days omitted
 - [ ] Follow-up (separate PR, before the chat panel): align frontend `computeWinRate` / `computeAvgWinLoss` /
       calendar day colouring with the win / loss / neutral rule (frontend still treats `> 0` as the only win
       and has no neutral concept)

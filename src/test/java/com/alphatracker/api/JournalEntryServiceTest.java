@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -59,6 +60,31 @@ public class JournalEntryServiceTest {
         assertNull(result.getId());
         assertEquals(day, result.getEntryDate());
         verify(journalEntryRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("getRange allows exactly 366 days but rejects 367, and rejects from after to")
+    void getRangeValidatesSpan() {
+        LocalDate from = LocalDate.of(2026, 1, 1);
+
+        assertDoesNotThrow(() -> journalEntryService.getRange(from, from.plusDays(365), mockUser));
+        assertThrows(IllegalArgumentException.class, () -> journalEntryService.getRange(from, from.plusDays(366), mockUser));
+        assertThrows(IllegalArgumentException.class, () -> journalEntryService.getRange(day, day.minusDays(1), mockUser));
+    }
+
+    @Test
+    @DisplayName("getRange keeps entries with notes or a bias and drops empty ones (e.g. screenshot-only days)")
+    void getRangeSkipsEmptyEntries() {
+        JournalEntry withNotes = JournalEntry.builder().entryDate(day).notes("Choppy").build();
+        JournalEntry biasOnly = JournalEntry.builder().entryDate(day.plusDays(1)).htfBias("Bullish").build();
+        JournalEntry blank = JournalEntry.builder().entryDate(day.plusDays(2)).notes("  ").build();
+        JournalEntry screenshotOnly = JournalEntry.builder().entryDate(day.plusDays(3)).build();
+        when(journalEntryRepository.findAllByUser_IdAndEntryDateBetweenOrderByEntryDateAsc(1L, day, day.plusDays(3)))
+                .thenReturn(List.of(withNotes, biasOnly, blank, screenshotOnly));
+
+        List<JournalEntry> result = journalEntryService.getRange(day, day.plusDays(3), mockUser);
+
+        assertEquals(List.of(withNotes, biasOnly), result);
     }
 
     @Test

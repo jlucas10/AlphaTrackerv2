@@ -23,6 +23,18 @@ public class JournalController {
     private final JournalAttachmentService journalAttachmentService;
     private final TradeService tradeService;
 
+    // Reflection text for a stretch of days: GET /api/v1/journal?from=&to=
+    // (both inclusive, both required - the span is capped, see the service).
+    // Lives on the bare path, so it can't collide with GET /{date}.
+    @GetMapping
+    public ResponseEntity<List<JournalEntrySummary>> getRange(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(journalEntryService.getRange(from, to, user).stream()
+                .map(JournalEntrySummary::fromEntity).toList());
+    }
+
     @GetMapping("/{date}")
     public ResponseEntity<JournalDayResponse> getDay(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
