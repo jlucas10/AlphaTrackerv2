@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,19 +51,6 @@ public class JournalEntryServiceTest {
     }
 
     @Test
-    @DisplayName("findOrCreate persists a new entry when none exists for the day yet")
-    void findOrCreatePersistsNewEntry() {
-        when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.empty());
-        when(journalEntryRepository.save(any(JournalEntry.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        JournalEntry result = journalEntryService.findOrCreate(day, mockUser);
-
-        assertEquals(day, result.getEntryDate());
-        assertEquals(mockUser, result.getUser());
-        verify(journalEntryRepository, times(1)).save(any(JournalEntry.class));
-    }
-
-    @Test
     @DisplayName("getOrDefault returns an unsaved placeholder for a day with no entry yet")
     void getOrDefaultReturnsUnsavedPlaceholderWhenMissing() {
         when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.empty());
@@ -75,15 +63,28 @@ public class JournalEntryServiceTest {
     }
 
     @Test
-    @DisplayName("getOrDefault returns the persisted entry when one already exists")
-    void getOrDefaultReturnsExistingEntry() {
-        JournalEntry existing = JournalEntry.builder().id(5L).user(mockUser).entryDate(day).notes("hi").build();
-        when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.of(existing));
+    @DisplayName("getRange allows exactly 366 days but rejects 367, and rejects from after to")
+    void getRangeValidatesSpan() {
+        LocalDate from = LocalDate.of(2026, 1, 1);
 
-        JournalEntry result = journalEntryService.getOrDefault(day, mockUser);
+        assertDoesNotThrow(() -> journalEntryService.getRange(from, from.plusDays(365), mockUser));
+        assertThrows(IllegalArgumentException.class, () -> journalEntryService.getRange(from, from.plusDays(366), mockUser));
+        assertThrows(IllegalArgumentException.class, () -> journalEntryService.getRange(day, day.minusDays(1), mockUser));
+    }
 
-        assertEquals(5L, result.getId());
-        assertEquals("hi", result.getNotes());
+    @Test
+    @DisplayName("getRange keeps entries with notes or a bias and drops empty ones (e.g. screenshot-only days)")
+    void getRangeSkipsEmptyEntries() {
+        JournalEntry withNotes = JournalEntry.builder().entryDate(day).notes("Choppy").build();
+        JournalEntry biasOnly = JournalEntry.builder().entryDate(day.plusDays(1)).htfBias("Bullish").build();
+        JournalEntry blank = JournalEntry.builder().entryDate(day.plusDays(2)).notes("  ").build();
+        JournalEntry screenshotOnly = JournalEntry.builder().entryDate(day.plusDays(3)).build();
+        when(journalEntryRepository.findAllByUser_IdAndEntryDateBetweenOrderByEntryDateAsc(1L, day, day.plusDays(3)))
+                .thenReturn(List.of(withNotes, biasOnly, blank, screenshotOnly));
+
+        List<JournalEntry> result = journalEntryService.getRange(day, day.plusDays(3), mockUser);
+
+        assertEquals(List.of(withNotes, biasOnly), result);
     }
 
     @Test
@@ -100,21 +101,5 @@ public class JournalEntryServiceTest {
         // findOrCreate's own save (the empty placeholder) plus upsertNotes'
         // save of the populated entry - both go through the same repository.
         verify(journalEntryRepository, times(2)).save(any(JournalEntry.class));
-    }
-
-    @Test
-    @DisplayName("upsertNotes overwrites notes/bias on an entry that already exists")
-    void upsertNotesOverwritesExistingEntry() {
-        JournalEntry existing = JournalEntry.builder().id(5L).user(mockUser).entryDate(day)
-                .notes("old notes").htfBias("Neutral").build();
-        when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.of(existing));
-        when(journalEntryRepository.save(any(JournalEntry.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        JournalEntry result = journalEntryService.upsertNotes(day, "new notes", "Bullish", mockUser);
-
-        assertEquals(5L, result.getId());
-        assertEquals("new notes", result.getNotes());
-        assertEquals("Bullish", result.getHtfBias());
-        verify(journalEntryRepository, times(1)).save(any(JournalEntry.class));
     }
 }

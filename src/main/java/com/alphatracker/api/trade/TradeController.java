@@ -29,38 +29,39 @@ public class TradeController {
     // longer carry an id (which save() would treat as an update to an existing
     // row) and cannot set profitLoss, which the service derives instead.
     @PostMapping
-    public ResponseEntity<Trade> createTrade(
+    public ResponseEntity<TradeResponse> createTrade(
             @RequestBody TradeRequest request,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(tradeService.logTrade(request, user));
+        return ResponseEntity.ok(TradeResponse.fromEntity(tradeService.logTrade(request, user)));
     }
 
     // Handles GET requests to /api/v1/trades
     // Supports fetching all trades or filtering by account:
     // /api/v1/trades?accountId=1
     @GetMapping
-    public ResponseEntity<List<Trade>> getTrades(
+    public ResponseEntity<List<TradeResponse>> getTrades(
             @AuthenticationPrincipal User user,
             @RequestParam(required = false) Long accountId) {
-        return ResponseEntity.ok(tradeService.getTradesForUser(user, accountId));
+        return ResponseEntity.ok(tradeService.getTradesForUser(user, accountId).stream()
+                .map(TradeResponse::fromEntity).toList());
     }
 
     // Handles GET requests to /api/v1/trades/{id} (ex, /api/v1/trades/5)
     @GetMapping("/{id}")
-    public ResponseEntity<Trade> getTradeById(
+    public ResponseEntity<TradeResponse> getTradeById(
             @PathVariable Long id,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(tradeService.getTradeById(id, user));
+        return ResponseEntity.ok(TradeResponse.fromEntity(tradeService.getTradeById(id, user)));
     }
 
     // Handles PATCH requests to /api/v1/trades/{id}. Narrow on purpose - see
     // TradeUpdateRequest for what's editable and why.
     @PatchMapping("/{id}")
-    public ResponseEntity<Trade> updateTrade(
+    public ResponseEntity<TradeResponse> updateTrade(
             @PathVariable Long id,
             @RequestBody TradeUpdateRequest request,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(tradeService.updateTrade(id, request, user));
+        return ResponseEntity.ok(TradeResponse.fromEntity(tradeService.updateTrade(id, request, user)));
     }
 
     // Handles DELETE requests to /api/v1/trades/{id}

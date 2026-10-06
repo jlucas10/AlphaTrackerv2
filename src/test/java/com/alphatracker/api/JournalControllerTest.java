@@ -77,6 +77,22 @@ public class JournalControllerTest {
     }
 
     @Test
+    @DisplayName("GET /journal?from=&to= returns date/notes/htfBias rows only, and doesn't collide with GET /journal/{date}")
+    void getRangeReturnsSummaries() throws Exception {
+        JournalEntry entry = JournalEntry.builder().id(5L).user(mockUser).entryDate(day)
+                .notes("Choppy session").htfBias("Neutral").build();
+        when(journalEntryService.getRange(day, day.plusDays(1), mockUser)).thenReturn(List.of(entry));
+
+        mockMvc.perform(get("/api/v1/journal").param("from", "2026-09-18").param("to", "2026-09-19")
+                        .with(user(mockUser)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].date").value("2026-09-18"))
+                .andExpect(jsonPath("$[0].notes").value("Choppy session"))
+                .andExpect(jsonPath("$[0].htfBias").value("Neutral"))
+                .andExpect(jsonPath("$[0].id").doesNotExist());
+    }
+
+    @Test
     @DisplayName("PUT /journal/{date} upserts notes/bias then returns the refreshed bundle")
     void upsertDayReturnsRefreshedBundle() throws Exception {
         JournalEntry updated = JournalEntry.builder().id(5L).user(mockUser).entryDate(day)

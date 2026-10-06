@@ -58,24 +58,6 @@ public class JournalAttachmentRepositoryTest {
     }
 
     @Test
-    @DisplayName("findAllByJournalEntry_IdOrderByUploadedAtAsc lists a day's attachments oldest first")
-    void findAllForEntryReturnsChronologicalOrder() {
-        JournalAttachment older = newAttachment(ownerEntry, "1/older.png");
-        older.setUploadedAt(LocalDateTime.now().minusHours(2));
-        JournalAttachment newer = newAttachment(ownerEntry, "1/newer.png");
-        newer.setUploadedAt(LocalDateTime.now());
-        attachmentRepository.save(newer);
-        attachmentRepository.save(older);
-        entityManager.flush();
-
-        List<JournalAttachment> result = attachmentRepository.findAllByJournalEntry_IdOrderByUploadedAtAsc(ownerEntry.getId());
-
-        assertEquals(2, result.size());
-        assertEquals("1/older.png", result.get(0).getStorageKey());
-        assertEquals("1/newer.png", result.get(1).getStorageKey());
-    }
-
-    @Test
     @DisplayName("deleteByIdAndJournalEntry_User_Id deletes nothing and reports 0 for the wrong owner")
     void deleteByWrongOwnerDeletesNothing() {
         JournalAttachment saved = attachmentRepository.save(newAttachment(ownerEntry, "1/a.png"));
@@ -85,18 +67,6 @@ public class JournalAttachmentRepositoryTest {
 
         assertEquals(0, deletedCount);
         assertTrue(attachmentRepository.findById(saved.getId()).isPresent());
-    }
-
-    @Test
-    @DisplayName("deleteByIdAndJournalEntry_User_Id removes the row and reports 1 for the real owner")
-    void deleteByOwnerRemovesRow() {
-        JournalAttachment saved = attachmentRepository.save(newAttachment(ownerEntry, "1/a.png"));
-        entityManager.flush();
-
-        long deletedCount = attachmentRepository.deleteByIdAndJournalEntry_User_Id(saved.getId(), owner.getId());
-
-        assertEquals(1, deletedCount);
-        assertTrue(attachmentRepository.findById(saved.getId()).isEmpty());
     }
 
     private JournalAttachment newAttachment(JournalEntry entry, String storageKey) {

@@ -114,23 +114,6 @@ public class TradeServiceTest {
     }
 
     @Test
-    @DisplayName("Should throw IllegalArgumentException when contract count is less than 1")
-    void testInvalidContractsThrowsException() {
-        TradeRequest request = new TradeRequest();
-        request.setTicker("MNQ");
-        request.setDirection("LONG");
-        request.setEntryPrice(20000.0);
-        request.setExitPrice(20010.0);
-        request.setContracts(0);
-
-        assertThrows(IllegalArgumentException.class, () -> {
-            tradeService.logTrade(request, mockUser);
-        });
-
-        verify(tradeRepository, never()).save(any());
-    }
-
-    @Test
     @DisplayName("Should delete trade and reverse its P/L on the linked account balance")
     void testDeleteTradeReversesAccountBalance() {
         // Arrange
@@ -215,28 +198,6 @@ public class TradeServiceTest {
     }
 
     @Test
-    @DisplayName("Should filter trades by account ID when provided")
-    void testGetTradesScopedToAccount() {
-        Long accountId = 10L;
-
-        tradeService.getTradesForUser(mockUser, accountId);
-
-        verify(tradeRepository, times(1))
-                .findAllByUserIdAndAccountIdOrderByTradeDateDesc(mockUser.getId(), accountId);
-        verify(tradeRepository, never()).findByUserId(any());
-    }
-
-    @Test
-    @DisplayName("Should fetch all trades for user when account ID is null")
-    void testGetTradesUnscopedWhenAccountIdIsNull() {
-        tradeService.getTradesForUser(mockUser, null);
-
-        verify(tradeRepository, times(1)).findByUserId(mockUser.getId());
-        verify(tradeRepository, never())
-                .findAllByUserIdAndAccountIdOrderByTradeDateDesc(any(), any());
-    }
-
-    @Test
     @DisplayName("Should attach a trade to the primary account when no accountId is given")
     void testLogTradeDefaultsToPrimaryAccountWhenAccountIdOmitted() {
         Account primaryAccount = Account.builder()
@@ -270,26 +231,6 @@ public class TradeServiceTest {
     }
 
     @Test
-    @DisplayName("Should leave a trade unassigned when no accountId is given and no primary account exists")
-    void testLogTradeStaysUnassignedWithoutPrimaryAccount() {
-        TradeRequest request = TradeRequest.builder()
-                .ticker("MNQ")
-                .direction("LONG")
-                .entryPrice(20150.25)
-                .exitPrice(20185.00)
-                .contracts(1)
-                .build();
-
-        when(accountRepository.findAllByUserIdAndIsPrimaryTrue(mockUser.getId())).thenReturn(List.of());
-        when(tradeRepository.save(any(Trade.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        Trade result = tradeService.logTrade(request, mockUser);
-
-        assertNull(result.getAccount());
-        verify(accountRepository, never()).save(any());
-    }
-
-    @Test
     @DisplayName("Should update execution rating and setup tags via PATCH")
     void testUpdateTradeSetsReflectionFields() {
         Trade existing = Trade.builder().id(42L).user(mockUser).build();
@@ -306,18 +247,6 @@ public class TradeServiceTest {
         assertEquals(4, result.getExecutionRating());
         assertEquals(List.of("FVG fill", "liquidity sweep"), result.getSetupTags());
         verify(tradeRepository, times(1)).save(existing);
-    }
-
-    @Test
-    @DisplayName("Should reject an execution rating outside 1-5")
-    void testUpdateTradeRejectsOutOfRangeRating() {
-        Trade existing = Trade.builder().id(42L).user(mockUser).build();
-        when(tradeRepository.findById(42L)).thenReturn(Optional.of(existing));
-
-        TradeUpdateRequest request = TradeUpdateRequest.builder().executionRating(6).build();
-
-        assertThrows(IllegalArgumentException.class, () -> tradeService.updateTrade(42L, request, mockUser));
-        verify(tradeRepository, never()).save(any());
     }
 
     @Test

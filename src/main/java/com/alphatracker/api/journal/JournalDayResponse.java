@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.alphatracker.api.trade.Trade;
+import com.alphatracker.api.trade.TradeResponse;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,7 +26,7 @@ public class JournalDayResponse {
     private String htfBias;
     private LocalDateTime updatedAt;
     private List<JournalAttachmentResponse> attachments;
-    private List<Trade> trades;
+    private List<TradeResponse> trades;
 
     public static JournalDayResponse fromEntities(LocalDate date, JournalEntry entry,
             List<JournalAttachment> attachments, List<Trade> trades) {
@@ -35,7 +36,7 @@ public class JournalDayResponse {
                 .htfBias(entry.getHtfBias())
                 .updatedAt(entry.getUpdatedAt())
                 .attachments(attachments.stream().map(JournalAttachmentResponse::fromEntity).toList())
-                .trades(trades)
+                .trades(trades.stream().map(TradeResponse::fromEntity).toList())
                 .build();
     }
 }

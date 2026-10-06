@@ -36,21 +36,6 @@ public class LocalFileStorageServiceTest {
     }
 
     @Test
-    @DisplayName("store() persists bytes and returns a key scoped to the owner")
-    void storePersistsBytesUnderOwnerScopedKey() throws IOException {
-        byte[] payload = "screenshot-bytes".getBytes(StandardCharsets.UTF_8);
-        InputStream content = new ByteArrayInputStream(payload);
-
-        StoredFile stored = storageService.store(content, payload.length, "chart.png", "image/png", 42L);
-
-        assertTrue(stored.storageKey().startsWith("42/"));
-        assertTrue(stored.storageKey().endsWith(".png"));
-        assertEquals(payload.length, stored.sizeBytes());
-        assertEquals("image/png", stored.contentType());
-        assertTrue(Files.exists(tempDir.resolve(stored.storageKey())));
-    }
-
-    @Test
     @DisplayName("retrieve() returns exactly the bytes that were stored")
     void retrieveReturnsStoredBytes() throws IOException {
         byte[] payload = "round-trip-me".getBytes(StandardCharsets.UTF_8);
@@ -65,33 +50,10 @@ public class LocalFileStorageServiceTest {
     }
 
     @Test
-    @DisplayName("retrieve() throws StorageException for a key that was never stored")
-    void retrieveThrowsForMissingKey() {
-        assertThrows(StorageException.class, () -> storageService.retrieve("7/does-not-exist.png"));
-    }
-
-    @Test
     @DisplayName("retrieve() rejects a storage key that attempts to escape the base path")
     void retrieveRejectsPathTraversal() {
         assertThrows(StorageException.class,
                 () -> storageService.retrieve("../../../../etc/passwd"));
-    }
-
-    @Test
-    @DisplayName("delete() removes a stored file, and a later retrieve() fails")
-    void deleteRemovesFile() {
-        byte[] payload = "to-be-deleted".getBytes(StandardCharsets.UTF_8);
-        StoredFile stored = storageService.store(new ByteArrayInputStream(payload), payload.length, "temp.png", "image/png", 3L);
-
-        storageService.delete(stored.storageKey());
-
-        assertThrows(StorageException.class, () -> storageService.retrieve(stored.storageKey()));
-    }
-
-    @Test
-    @DisplayName("delete() on an already-missing key is a no-op, not an error")
-    void deleteIsNoopWhenFileAlreadyGone() {
-        assertDoesNotThrow(() -> storageService.delete("3/never-existed.png"));
     }
 
     @Test

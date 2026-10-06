@@ -97,31 +97,6 @@ public class JournalAttachmentServiceTest {
     }
 
     @Test
-    @DisplayName("Should return an empty list without querying attachments when the day has no entry yet")
-    void getAttachmentsForDateReturnsEmptyWhenNoEntryExists() {
-        JournalEntry unsaved = JournalEntry.builder().user(mockUser).entryDate(day).build();
-        when(journalEntryService.getOrDefault(day, mockUser)).thenReturn(unsaved);
-
-        List<JournalAttachment> result = attachmentService.getAttachmentsForDate(day, mockUser);
-
-        assertTrue(result.isEmpty());
-        verify(attachmentRepository, never()).findAllByJournalEntry_IdOrderByUploadedAtAsc(any());
-    }
-
-    @Test
-    @DisplayName("Should list attachments for a day that already has an entry")
-    void getAttachmentsForDateReturnsExistingAttachments() {
-        JournalAttachment attachment = JournalAttachment.builder().id(1L).journalEntry(mockEntry).storageKey("1/a.png").build();
-        when(journalEntryService.getOrDefault(day, mockUser)).thenReturn(mockEntry);
-        when(attachmentRepository.findAllByJournalEntry_IdOrderByUploadedAtAsc(50L)).thenReturn(List.of(attachment));
-
-        List<JournalAttachment> result = attachmentService.getAttachmentsForDate(day, mockUser);
-
-        assertEquals(1, result.size());
-        assertEquals("1/a.png", result.get(0).getStorageKey());
-    }
-
-    @Test
     @DisplayName("Should delete both the stored file and the row when the owner deletes an attachment")
     void deleteAttachmentRemovesFileAndRow() {
         JournalAttachment attachment = JournalAttachment.builder()

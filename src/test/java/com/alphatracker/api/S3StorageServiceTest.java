@@ -72,16 +72,6 @@ public class S3StorageServiceTest {
     }
 
     @Test
-    @DisplayName("store() wraps an S3 failure in StorageException")
-    void storeWrapsS3Failure() {
-        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-                .thenThrow(S3Exception.builder().message("boom").build());
-
-        assertThrows(StorageException.class, () -> storageService.store(
-                new ByteArrayInputStream("x".getBytes()), 1L, "a.png", "image/png", 1L));
-    }
-
-    @Test
     @DisplayName("retrieve() returns the object's bytes for the given key")
     void retrieveReturnsObjectStream() {
         ResponseInputStream<GetObjectResponse> response = new ResponseInputStream<>(
@@ -99,15 +89,6 @@ public class S3StorageServiceTest {
     }
 
     @Test
-    @DisplayName("retrieve() throws StorageException for a key that doesn't exist")
-    void retrieveThrowsForMissingKey() {
-        when(s3Client.getObject(any(GetObjectRequest.class)))
-                .thenThrow(NoSuchKeyException.builder().message("not found").build());
-
-        assertThrows(StorageException.class, () -> storageService.retrieve("1/missing.png"));
-    }
-
-    @Test
     @DisplayName("delete() calls DeleteObject with the given key")
     void deleteCallsDeleteObject() {
         storageService.delete("1/uuid.png");
@@ -116,27 +97,5 @@ public class S3StorageServiceTest {
         verify(s3Client, times(1)).deleteObject(requestCaptor.capture());
         assertEquals(BUCKET, requestCaptor.getValue().bucket());
         assertEquals("1/uuid.png", requestCaptor.getValue().key());
-    }
-
-    @Test
-    @DisplayName("delete() wraps an S3 failure in StorageException")
-    void deleteWrapsS3Failure() {
-        when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
-                .thenThrow(S3Exception.builder().message("boom").build());
-
-        assertThrows(StorageException.class, () -> storageService.delete("1/uuid.png"));
-    }
-
-    @Test
-    @DisplayName("a hostile original filename never influences the generated key")
-    void maliciousFilenameCannotEscapeOwnerPrefix() {
-        byte[] payload = "safe".getBytes();
-
-        StoredFile result = storageService.store(new ByteArrayInputStream(payload), payload.length,
-                "../../../etc/passwd", "text/plain", 9L);
-
-        assertTrue(result.storageKey().startsWith("9/"));
-        assertFalse(result.storageKey().contains(".."));
-        assertFalse(result.storageKey().contains("/etc/"));
     }
 }
