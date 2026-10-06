@@ -261,11 +261,12 @@ with tool calling; each tool is a read-only GET to this Spring API forwarding th
 The model never does arithmetic and Python never touches the DB. Later phases: hand-written tool
 loop, 50-question eval set, pgvector over journal notes, React chat panel.
 
-- [ ] `TradeResponse` DTO (drops embedded `User`, adds `accountId`)
-- [ ] `TradeStats` pure calculator (win/loss rule above)
-- [ ] Repository range queries (`>=` start, `<` next-day start — never `Between` on `tradeDate`)
-- [ ] `GET /api/v1/analytics/summary` (trade stats + day stats), `/breakdown?by=instrument|setup|rating`,
+- [x] `TradeResponse` DTO (drops embedded `User`, adds `accountId`)
+- [x] `TradeStats` pure calculator (win/loss/neutral rule above)
+- [x] Repository range queries (`>=` start, `<` next-day start — never `Between` on `tradeDate`)
+- [x] `GET /api/v1/analytics/summary` (trade stats + day stats), `/breakdown?by=instrument|setup|rating`,
       `/discipline` (`followedPlan` split). Loss-streak stat dropped — not relevant to a discipline journal.
+      Filters: `?accountId=&from=&to=` (dates inclusive). A non-owned `accountId` is a 403.
 - [ ] `GET /api/v1/journal?from=&to=`
 - [ ] Follow-up (separate PR, before the chat panel): align frontend `computeWinRate` / `computeAvgWinLoss` /
       calendar day colouring with the win / loss / neutral rule (frontend still treats `> 0` as the only win
