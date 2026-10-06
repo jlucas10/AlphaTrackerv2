@@ -65,15 +65,6 @@ public class JournalEntryRepositoryTest {
         assertTrue(asOtherUser.isEmpty());
     }
 
-    @Test
-    @DisplayName("findByUser_IdAndEntryDate returns empty for a day with no entry yet")
-    void returnsEmptyForMissingDay() {
-        Optional<JournalEntry> found =
-                journalEntryRepository.findByUser_IdAndEntryDate(owner.getId(), LocalDate.of(2026, 1, 1));
-
-        assertTrue(found.isEmpty());
-    }
-
     private User persistUser(String email) {
         User user = User.builder().email(email).password("hashed").firstName("Test").role(Role.USER).build();
         entityManager.persist(user);

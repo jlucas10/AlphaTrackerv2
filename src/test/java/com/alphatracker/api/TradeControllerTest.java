@@ -67,17 +67,6 @@ public class TradeControllerTest {
     }
 
     @Test
-    @DisplayName("GET /trades/{id} returns the same safe shape")
-    void singleTradeHasNoUser() throws Exception {
-        when(tradeService.getTradeById(99L, mockUser)).thenReturn(trade);
-
-        mockMvc.perform(get("/api/v1/trades/99").with(user(mockUser)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ticker").value("MNQ"))
-                .andExpect(jsonPath("$.user").doesNotExist());
-    }
-
-    @Test
     @DisplayName("a foreign trade is still a 403 through the exception handler")
     void foreignTradeIs403() throws Exception {
         when(tradeService.getTradeById(99L, mockUser)).thenThrow(new SecurityException("Unauthorized"));

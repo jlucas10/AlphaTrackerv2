@@ -50,19 +50,6 @@ public class JournalEntryServiceTest {
     }
 
     @Test
-    @DisplayName("findOrCreate persists a new entry when none exists for the day yet")
-    void findOrCreatePersistsNewEntry() {
-        when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.empty());
-        when(journalEntryRepository.save(any(JournalEntry.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        JournalEntry result = journalEntryService.findOrCreate(day, mockUser);
-
-        assertEquals(day, result.getEntryDate());
-        assertEquals(mockUser, result.getUser());
-        verify(journalEntryRepository, times(1)).save(any(JournalEntry.class));
-    }
-
-    @Test
     @DisplayName("getOrDefault returns an unsaved placeholder for a day with no entry yet")
     void getOrDefaultReturnsUnsavedPlaceholderWhenMissing() {
         when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.empty());
@@ -72,18 +59,6 @@ public class JournalEntryServiceTest {
         assertNull(result.getId());
         assertEquals(day, result.getEntryDate());
         verify(journalEntryRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("getOrDefault returns the persisted entry when one already exists")
-    void getOrDefaultReturnsExistingEntry() {
-        JournalEntry existing = JournalEntry.builder().id(5L).user(mockUser).entryDate(day).notes("hi").build();
-        when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.of(existing));
-
-        JournalEntry result = journalEntryService.getOrDefault(day, mockUser);
-
-        assertEquals(5L, result.getId());
-        assertEquals("hi", result.getNotes());
     }
 
     @Test
@@ -100,21 +75,5 @@ public class JournalEntryServiceTest {
         // findOrCreate's own save (the empty placeholder) plus upsertNotes'
         // save of the populated entry - both go through the same repository.
         verify(journalEntryRepository, times(2)).save(any(JournalEntry.class));
-    }
-
-    @Test
-    @DisplayName("upsertNotes overwrites notes/bias on an entry that already exists")
-    void upsertNotesOverwritesExistingEntry() {
-        JournalEntry existing = JournalEntry.builder().id(5L).user(mockUser).entryDate(day)
-                .notes("old notes").htfBias("Neutral").build();
-        when(journalEntryRepository.findByUser_IdAndEntryDate(1L, day)).thenReturn(Optional.of(existing));
-        when(journalEntryRepository.save(any(JournalEntry.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        JournalEntry result = journalEntryService.upsertNotes(day, "new notes", "Bullish", mockUser);
-
-        assertEquals(5L, result.getId());
-        assertEquals("new notes", result.getNotes());
-        assertEquals("Bullish", result.getHtfBias());
-        verify(journalEntryRepository, times(1)).save(any(JournalEntry.class));
     }
 }

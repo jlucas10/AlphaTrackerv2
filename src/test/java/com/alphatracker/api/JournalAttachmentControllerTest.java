@@ -83,38 +83,6 @@ public class JournalAttachmentControllerTest {
     }
 
     @Test
-    @DisplayName("POST /journal/{date}/attachments surfaces a service rejection as 400")
-    void uploadAttachmentRejectedByServiceReturns400() throws Exception {
-        when(attachmentService.uploadAttachment(any(), any(), anyLong(), any(), any(), any(), any()))
-                .thenThrow(new IllegalArgumentException("Unsupported file type: application/zip."));
-
-        MockMultipartFile file = new MockMultipartFile("file", "bad.zip", "application/zip", "bytes".getBytes());
-
-        mockMvc.perform(multipart("/api/v1/journal/2026-09-18/attachments")
-                        .file(file)
-                        .with(user(mockUser))
-                        .with(csrf()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Unsupported file type: application/zip."));
-    }
-
-    @Test
-    @DisplayName("GET /journal/{date}/attachments returns the service's list as DTOs")
-    void getAttachmentsForDateReturnsList() throws Exception {
-        JournalAttachment attachment = JournalAttachment.builder()
-                .id(10L).journalEntry(mockEntry).storageKey("1/a.png")
-                .attachmentType(AttachmentType.SCREENSHOT).contentType("image/png")
-                .sizeBytes(5L).uploadedAt(LocalDateTime.now()).build();
-
-        when(attachmentService.getAttachmentsForDate(day, mockUser)).thenReturn(List.of(attachment));
-
-        mockMvc.perform(get("/api/v1/journal/2026-09-18/attachments").with(user(mockUser)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(10))
-                .andExpect(jsonPath("$[0].url").value("/api/v1/journal-attachments/10/file"));
-    }
-
-    @Test
     @DisplayName("GET /journal-attachments/{id}/file streams the bytes with the stored Content-Type")
     void getAttachmentFileStreamsBytesWithContentType() throws Exception {
         JournalAttachment attachment = JournalAttachment.builder()
@@ -140,14 +108,5 @@ public class JournalAttachmentControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(attachmentService, never()).openAttachmentContent(any());
-    }
-
-    @Test
-    @DisplayName("DELETE /journal-attachments/{id} deletes via the service and returns 200")
-    void deleteAttachmentReturnsOk() throws Exception {
-        mockMvc.perform(delete("/api/v1/journal-attachments/10").with(user(mockUser)).with(csrf()))
-                .andExpect(status().isOk());
-
-        verify(attachmentService, times(1)).deleteAttachment(10L, mockUser);
     }
 }

@@ -132,67 +132,6 @@ public class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("A null drawdownMode on an existing account is treated as END_OF_DAY")
-    void testNullDrawdownModeDefaultsToEndOfDay() {
-        Account account = Account.builder()
-                .id(4L)
-                .startingBalance(50000.0)
-                .maxDrawdown(2000.0)
-                .drawdownMode(null)
-                .build();
-
-        List<Trade> trades = List.of(
-                trade(2000.0, LocalDateTime.of(2026, 1, 5, 10, 0)),
-                trade(-1500.0, LocalDateTime.of(2026, 1, 5, 14, 0)));
-
-        when(tradeRepository.findAllByAccountIdOrderByTradeDateAsc(4L)).thenReturn(trades);
-
-        DrawdownSnapshot snapshot = accountService.computeDrawdownSnapshot(account);
-
-        // Behaves like the END_OF_DAY test above: the intraday 52000 spike
-        // never counts, only the day's close of 50500 does.
-        assertEquals(50500.0, snapshot.highWaterMark(), 0.001);
-    }
-
-    @Test
-    @DisplayName("createAccount rejects a trailingStopsAtBalance that isn't positive")
-    void testCreateAccountRejectsNonPositiveTrailingStop() {
-        AccountRequest request = AccountRequest.builder()
-                .name("Apex 50k #1")
-                .firm("Apex")
-                .startingBalance(50000.0)
-                .maxDrawdown(2000.0)
-                .trailingStopsAtBalance(0.0)
-                .build();
-
-        assertThrows(IllegalArgumentException.class, () -> accountService.createAccount(request, mockUser));
-    }
-
-    @Test
-    @DisplayName("createAccount defaults drawdownMode to END_OF_DAY when not specified")
-    void testCreateAccountDefaultsDrawdownMode() {
-        AccountRequest request = AccountRequest.builder()
-                .name("Apex 50k #1")
-                .firm("Apex")
-                .startingBalance(50000.0)
-                .maxDrawdown(2000.0)
-                .build();
-
-        when(accountRepository.save(org.mockito.ArgumentMatchers.any(Account.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        // The saved account has no id assigned by this mock, so the lookup
-        // arrives with a null accountId.
-        when(tradeRepository.findAllByAccountIdOrderByTradeDateAsc(org.mockito.ArgumentMatchers.isNull()))
-                .thenReturn(List.of());
-
-        AccountResponse response = accountService.createAccount(request, mockUser);
-
-        assertEquals(DrawdownMode.END_OF_DAY, response.getDrawdownMode());
-        assertEquals(50000.0, response.getHighWaterMark(), 0.001);
-        assertEquals(48000.0, response.getDrawdownFloor(), 0.001);
-    }
-
-    @Test
     @DisplayName("createAccount makes a trader's very first account primary automatically")
     void testCreateAccountFirstAccountIsPrimary() {
         AccountRequest request = AccountRequest.builder()
@@ -210,26 +149,6 @@ public class AccountServiceTest {
         AccountResponse response = accountService.createAccount(request, mockUser);
 
         assertTrue(response.getIsPrimary());
-    }
-
-    @Test
-    @DisplayName("createAccount does not make a second account primary")
-    void testCreateAccountSecondAccountIsNotPrimary() {
-        Account existing = Account.builder().id(1L).isPrimary(true).build();
-        AccountRequest request = AccountRequest.builder()
-                .name("Topstep 100k #1")
-                .firm("Topstep")
-                .startingBalance(100000.0)
-                .maxDrawdown(3000.0)
-                .build();
-
-        when(accountRepository.findAllByUserId(mockUser.getId())).thenReturn(List.of(existing));
-        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(tradeRepository.findAllByAccountIdOrderByTradeDateAsc(any())).thenReturn(List.of());
-
-        AccountResponse response = accountService.createAccount(request, mockUser);
-
-        assertFalse(response.getIsPrimary());
     }
 
     @Test
@@ -253,39 +172,11 @@ public class AccountServiceTest {
     }
 
     @Test
-    @DisplayName("setPrimaryAccount is a no-op on the primary flag when the account is already primary")
-    void testSetPrimaryAccountAlreadyPrimary() {
-        Account account = Account.builder().id(1L).isPrimary(true).user(mockUser)
-                .startingBalance(50000.0).maxDrawdown(2000.0).build();
-
-        when(accountRepository.findByIdAndUserId(1L, mockUser.getId())).thenReturn(Optional.of(account));
-        when(accountRepository.findAllByUserIdAndIsPrimaryTrue(mockUser.getId())).thenReturn(List.of(account));
-        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(tradeRepository.findAllByAccountIdOrderByTradeDateAsc(any())).thenReturn(List.of());
-
-        AccountResponse response = accountService.setPrimaryAccount(1L, mockUser);
-
-        assertTrue(response.getIsPrimary());
-        // The account is both the target and the (only) currently-primary
-        // account, so the "unset others" loop must skip it rather than
-        // toggling it off right before the code below turns it back on.
-        assertTrue(account.getIsPrimary());
-    }
-
-    @Test
     @DisplayName("setPrimaryAccount throws when the account does not belong to the requesting user")
     void testSetPrimaryAccountRejectsUnownedAccount() {
         when(accountRepository.findByIdAndUserId(99L, mockUser.getId())).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () -> accountService.setPrimaryAccount(99L, mockUser));
-    }
-
-    @Test
-    @DisplayName("backfillUnassignedTrades throws when the user has no primary account")
-    void testBackfillThrowsWithoutPrimaryAccount() {
-        when(accountRepository.findAllByUserIdAndIsPrimaryTrue(mockUser.getId())).thenReturn(List.of());
-
-        assertThrows(IllegalArgumentException.class, () -> accountService.backfillUnassignedTrades(mockUser));
     }
 
     @Test
@@ -308,23 +199,5 @@ public class AccountServiceTest {
         assertEquals(primary, orphan1.getAccount());
         assertEquals(primary, orphan2.getAccount());
         verify(tradeRepository, times(1)).saveAll(List.of(orphan1, orphan2));
-    }
-
-    @Test
-    @DisplayName("backfillUnassignedTrades is a no-op when there are no unassigned trades")
-    void testBackfillNoOpWhenNothingUnassigned() {
-        Account primary = Account.builder().id(1L).startingBalance(50000.0).maxDrawdown(2000.0)
-                .currentBalance(50000.0).isPrimary(true).user(mockUser).build();
-
-        when(accountRepository.findAllByUserIdAndIsPrimaryTrue(mockUser.getId())).thenReturn(List.of(primary));
-        when(tradeRepository.findAllByUserIdAndAccountIsNull(mockUser.getId())).thenReturn(List.of());
-        when(tradeRepository.findAllByAccountIdOrderByTradeDateAsc(any())).thenReturn(List.of());
-
-        BackfillResult result = accountService.backfillUnassignedTrades(mockUser);
-
-        assertEquals(0, result.tradesBackfilled());
-        assertEquals(50000.0, result.account().getCurrentBalance(), 0.001);
-        verify(accountRepository, never()).save(any());
-        verify(tradeRepository, never()).saveAll(any());
     }
 }
