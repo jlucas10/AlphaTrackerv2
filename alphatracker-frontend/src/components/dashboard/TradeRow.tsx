@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { Trade } from '../../types/Trade';
 import { formatUsd } from '../../utils/formatters';
+import { classifyPnl } from '../../utils/tradeOutcome';
 
 interface TradeRowProps {
   trade: Trade;
@@ -14,7 +15,7 @@ interface TradeRowProps {
 const TradeRow: React.FC<TradeRowProps> = ({ trade, onDelete, showDate = true }) => {
   const [deleting, setDeleting] = useState(false);
 
-  const isWin = trade.profitLoss > 0;
+  const outcome = classifyPnl(trade.profitLoss);
   const isLong = trade.direction?.toUpperCase() === 'LONG';
 
   const handleDelete = async () => {
@@ -63,7 +64,7 @@ const TradeRow: React.FC<TradeRowProps> = ({ trade, onDelete, showDate = true })
 
       <td
         className={`py-3 px-3 text-xs font-black text-right tabular-nums ${
-          isWin ? 'text-emerald-600' : 'text-red-600'
+          outcome === 'win' ? 'text-emerald-600' : outcome === 'loss' ? 'text-red-600' : 'text-gray-500'
         }`}
       >
         {formatUsd(trade.profitLoss)}
