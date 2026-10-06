@@ -13,6 +13,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -63,6 +64,22 @@ public class JournalEntryRepositoryTest {
         Optional<JournalEntry> asOtherUser = journalEntryRepository.findByUser_IdAndEntryDate(otherUser.getId(), day);
 
         assertTrue(asOtherUser.isEmpty());
+    }
+
+    @Test
+    @DisplayName("range query is inclusive on both end dates, ordered by date, and excludes other users' entries")
+    void rangeIsInclusiveOrderedAndScopedToUser() {
+        for (int d : new int[] { 17, 18, 20, 21 }) {
+            journalEntryRepository.save(JournalEntry.builder().user(owner).entryDate(LocalDate.of(2026, 9, d)).build());
+        }
+        journalEntryRepository.save(JournalEntry.builder().user(otherUser).entryDate(LocalDate.of(2026, 9, 19)).build());
+        entityManager.flush();
+
+        List<JournalEntry> result = journalEntryRepository.findAllByUser_IdAndEntryDateBetweenOrderByEntryDateAsc(
+                owner.getId(), LocalDate.of(2026, 9, 18), LocalDate.of(2026, 9, 20));
+
+        assertEquals(List.of(LocalDate.of(2026, 9, 18), LocalDate.of(2026, 9, 20)),
+                result.stream().map(JournalEntry::getEntryDate).toList());
     }
 
     private User persistUser(String email) {
