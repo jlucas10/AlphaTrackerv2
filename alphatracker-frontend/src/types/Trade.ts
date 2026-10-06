@@ -15,11 +15,6 @@ export interface Trade {
   // distinct from JournalEntry's day-level notes/htfBias.
   executionRating?: number | null;
   setupTags?: string[];
-  user?: {
-    id: number;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: string;
-  };
+  // Which account the trade belongs to; null for unassigned trades.
+  accountId?: number | null;
 }

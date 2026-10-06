@@ -20,20 +20,19 @@ chart screenshots, execution ratings, and setup tags, organized by trading day.
 Most trading journals are built for retail stock/options traders. A prop-firm futures
 trader has a different problem entirely: they're not just tracking P/L, they're being
 evaluated against a firm's rules — a maximum drawdown that trails their equity curve,
-a profit target to hit, a fixed commission per contract that varies wildly by
+a profit target to hit, and a dollar-per-point value that varies wildly by
 instrument (a 10-point move is $20 on MNQ and $200 on NQ). Get the math wrong and you
 misjudge how close you are to blowing an account.
 
 AlphaTracker's core design principle: **the trader inputs only what they observed** —
-ticker, direction, entry, exit, size. Every dollar figure (commission, gross P/L, net
-P/L, drawdown floor) is derived server-side from a single source of truth, so there's
+ticker, direction, entry, exit, size. Every dollar figure (P/L, drawdown floor) is derived server-side from a single source of truth, so there's
 nowhere for a mistake to hide and nothing for the trader to mistype.
 
 ## Features
 
 - **Server-derived trade economics** — log a ticker, direction, entry/exit, and
-  contract size; the backend looks up the instrument's point value and round-turn fee
-  and computes net P/L. Unknown tickers are rejected outright, never silently
+  contract size; the backend looks up the instrument's point value
+  and computes P/L. Unknown tickers are rejected outright, never silently
   defaulted.
 - **Prop account management** — track multiple prop firm accounts side by side
   (Evaluation vs. Funded), each with its own starting balance, max drawdown, and
@@ -86,7 +85,7 @@ src/main/java/com/alphatracker/api/
 
 **Request flow:** the frontend never computes money. A trade entry form posts raw
 observations to `POST /api/v1/trades`; `TradeService` resolves the `Instrument`,
-derives commission and net P/L, and returns the persisted trade. The frontend just
+derives P/L from the instrument's point value, and returns the persisted trade. The frontend just
 displays what the server already calculated — this is deliberate, and it's the same
 reason attachments and journal entries are ownership-checked on *every* request
 server-side rather than trusted from a client-supplied ID.

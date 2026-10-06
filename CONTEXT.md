@@ -1,8 +1,8 @@
 # AlphaTracker — Project Context & Architecture
 
 A futures trading journal built for a **prop-firm trader**. Not a retail brokerage app: the
-trader is evaluated against firm rules (profit targets, trailing drawdown), and commissions
-are a fixed function of the contract traded.
+trader is evaluated against firm rules (profit targets, trailing drawdown). No commission or
+fee is modeled: prop firms don't pass per-trade commissions through the way a retail broker does.
 
 ## Core Tech Stack
 
@@ -24,21 +24,31 @@ are a fixed function of the contract traded.
 ## Domain Model: How Money & Risk Are Calculated
 
 **The trader inputs only what they observed** — ticker, direction, entry, exit, contracts.
-Never a commission, never a dollar multiplier. A 10-point move is $20 on MNQ and $200 on NQ;
+Never a dollar multiplier. A 10-point move is $20 on MNQ and $200 on NQ;
 that difference belongs in the server, not the trader's head.
 
 `Instrument` (enum, `com.alphatracker.api.trade`) is the single source of truth for contract
 economics — 12 contracts (ES/MES, NQ/MNQ, YM/MYM, RTY/M2K, CL/MCL, GC/MGC), each with a
-`pointValue` (fixed CME spec) and a `roundTurnFee` per contract.
+`pointValue` (fixed CME spec). There is no commission/round-turn fee anywhere in the model
+(removed in `eb3e212`).
 
 ```text
 priceMove  = LONG ? exit - entry : entry - exit
-gross      = priceMove × pointValue × contracts
-commission = roundTurnFee × contracts
-profitLoss = round2(gross - commission)      ← stored NET, what hits the prop account
+profitLoss = round2(priceMove × pointValue × contracts)   ← stored as-is, what hits the prop account
 ```
 
 Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
+
+### Win / Loss Definition (applies to all analytics)
+
+There is no "breakeven" category. A trade is only judged once it is logged, so:
+
+- **Win (profit):** `profitLoss >= 0` — a trade that closes at exactly 0 counts as a win.
+- **Loss:** `profitLoss < 0`.
+- `winRate = wins / tradeCount`; every trade is exactly one of the two.
+- **Days follow the same rule:** a day whose trades net to exactly 0 is a profit day, never
+  "nothing", because trades were taken.
+- Streaks: a win (including a 0) breaks a losing streak.
 
 ---
 
@@ -50,7 +60,7 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 - `account/AccountService.java` — account CRUD and user boundary checks
 - `account/AccountController.java` — REST endpoints (`/api/v1/accounts`)
 - `account/DrawdownMode.java` — enum (`END_OF_DAY`, `PER_TRADE_CLOSE`)
-- `trade/Instrument.java` — contract economics (point values + round-turn fees)
+- `trade/Instrument.java` — contract economics (point values only)
 - `trade/Trade.java` — execution entity linked to `User` and optionally `Account`
 - `trade/TradeRequest.java` — POST write contract; accepts optional `accountId`
 - `trade/TradeService.java` — validates inputs, derives money, updates live account balance, handles primary account default
@@ -153,11 +163,11 @@ of these platforms without them):**
       `application.security.jwt.secret-key`, `application.storage.local.base-path`, and
       `application.cors.allowed-origins` are all `${VAR:local-dev-default}` now — local
       dev behavior is unchanged, Railway will override all of them without touching this file.
-- [ ] **S3 `StorageService` adapter.** The only remaining hard blocker: local disk
+- [x] **S3 `StorageService` adapter.** The only remaining hard blocker: local disk
       (`storage.local.base-path`) does not survive a container restart/redeploy on
       any of these platforms. This is the deferred Sprint 3 work, now required
       rather than optional.
-- [ ] **Frontend API base URL.** `apiClient.ts`'s `baseURL` is hardcoded to
+- [x] **Frontend API base URL.** `apiClient.ts`'s `baseURL` is hardcoded to
       `http://localhost:8080/api/v1` - needs a build-time env var
       (`VITE_API_BASE_URL`) so the Vercel build points at the deployed backend.
 - [x] **CORS origin now configurable** via `CORS_ALLOWED_ORIGINS` — mechanism is
@@ -177,7 +187,7 @@ of these platforms without them):**
        unit tests (mocked `S3Client`). Bucket + scoped IAM user + Budget alert
        set up in the AWS console. **Live-tested twice against the real bucket**
        (`alphatracker-attachments-josiah`, us-east-2) — once via `mvnw
-   spring-boot:run`, once through the actual Docker image (the real
+spring-boot:run`, once through the actual Docker image (the real
        deploy path): store → retrieve (byte-identical) → delete, through the
        running app, not mocks. Caught one real bug in the process: a missing
        `S3_ACCESS_KEY_ID` correctly fails the container at startup rather
@@ -217,7 +227,7 @@ of these platforms without them):**
        redeploy (container restarts from scratch), and confirmed the
        screenshot was still retrievable afterward, byte-identical. This is
        exactly what local disk storage could never have survived.
-7. [ ] Add the live link to the README and resume.
+7. [x] Add the live link to the README and resume.
 
 **Live URLs:** frontend `https://alpha-tracker-journal.vercel.app` · backend
 `https://alphatrackerv2-production.up.railway.app`
@@ -241,6 +251,19 @@ migration history ever becomes necessary.
 
 ---
 
+### Sprint 4.5 — AI Trade Review Assistant, Phase 1 (Java groundwork)
+
+Architecture (decided): separate Python FastAPI service (`/alphatracker-assistant`) calling Gemini
+with tool calling; each tool is a read-only GET to this Spring API forwarding the user's JWT.
+The model never does arithmetic and Python never touches the DB. Later phases: hand-written tool
+loop, 50-question eval set, pgvector over journal notes, React chat panel.
+
+- [ ] `TradeResponse` DTO (drops embedded `User`, adds `accountId`)
+- [ ] `TradeStats` pure calculator (win/loss rule above)
+- [ ] Repository range queries (`>=` start, `<` next-day start — never `Between` on `tradeDate`)
+- [ ] `GET /api/v1/analytics/summary`, `/breakdown?by=instrument|setup|rating`, `/after-losses`
+- [ ] `GET /api/v1/journal?from=&to=`
+
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
 Raised while reviewing Sprint 3.5: the sidebar's "Accounts" button currently just pops `CreateAccountModal` directly — there's no page to browse, manage, or retire accounts. Requirements as discussed:
@@ -263,7 +286,7 @@ Design sketch for when this gets picked up:
 **Trailing on closed balance:**
 
 ```text
-closedBalance   = startingBalance + Σ profitLoss        (net, as already stored)
+closedBalance   = startingBalance + Σ profitLoss        (as already stored)
 highWaterMark   = max(closedBalance) over account history
 drawdownFloor   = highWaterMark - maxDrawdown
 cushion         = closedBalance - drawdownFloor          ← the number that matters
