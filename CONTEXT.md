@@ -41,14 +41,17 @@ Unknown tickers are **rejected**, never defaulted to a 1.0 multiplier.
 
 ### Win / Loss Definition (applies to all analytics)
 
-There is no "breakeven" category. A trade is only judged once it is logged, so:
-
-- **Win (profit):** `profitLoss >= 0` — a trade that closes at exactly 0 counts as a win.
-- **Loss:** `profitLoss < 0`.
-- `winRate = wins / tradeCount`; every trade is exactly one of the two.
-- **Days follow the same rule:** a day whose trades net to exactly 0 is a profit day, never
-  "nothing", because trades were taken.
-- Streaks: a win (including a 0) breaks a losing streak.
+- **Win:** `profitLoss > 0`. **Loss:** `profitLoss < 0`. **Neutral:** exactly `0` — back at the
+  start point; it is neither a win nor a loss.
+- `winRate = wins / (wins + losses)`; neutral results are left out of the denominator.
+- **Neutral is never hidden.** Every summary also reports `neutral` (count) and `neutralRate`
+  (`neutral / tradeCount`). Many neutral trades or days is a warning sign — profit being given up,
+  or a system that isn't working — so the assistant must be able to see it. The API returns the
+  rates only; the "that's a red flag" interpretation lives in the assistant's prompt, not in Java.
+- **Days use the same rule:** a day's trades are netted (summed in whole cents), then the day is a
+  win day (`> 0`), loss day (`< 0`) or **neutral day** (`== 0`). `neutralDayRate = neutralDays / tradingDays`.
+- **Discipline:** the `followedPlan` flag is the focus, not loss streaks. Trades are split into
+  followed / broke-plan / unspecified (null flag, legacy rows) with the same stats on each side.
 
 ---
 
@@ -261,8 +264,12 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
 - [ ] `TradeResponse` DTO (drops embedded `User`, adds `accountId`)
 - [ ] `TradeStats` pure calculator (win/loss rule above)
 - [ ] Repository range queries (`>=` start, `<` next-day start — never `Between` on `tradeDate`)
-- [ ] `GET /api/v1/analytics/summary`, `/breakdown?by=instrument|setup|rating`, `/after-losses`
+- [ ] `GET /api/v1/analytics/summary` (trade stats + day stats), `/breakdown?by=instrument|setup|rating`,
+      `/discipline` (`followedPlan` split). Loss-streak stat dropped — not relevant to a discipline journal.
 - [ ] `GET /api/v1/journal?from=&to=`
+- [ ] Follow-up (separate PR, before the chat panel): align frontend `computeWinRate` / `computeAvgWinLoss` /
+      calendar day colouring with the win / loss / neutral rule (frontend still treats `> 0` as the only win
+      and has no neutral concept)
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
