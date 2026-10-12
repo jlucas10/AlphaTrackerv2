@@ -315,7 +315,10 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
 **Checklist (one numbered item at a time, review after each):**
 
 - [x] 1. Scaffold: layout, config, `GET /health`, Dockerfile, README, CORS, `.env` git-ignored, 3 pytest tests
-- [ ] 2. `SpringClient` (GET-only, JWT forwarding, allowlist, 403 mapping) + ~4 tests
+- [x] 2. `SpringClient` (GET-only, JWT forwarding, allowlist, 403 mapping) + 4 tests. Verified live: no token,
+      garbage token, expired-but-validly-signed token, and unknown user ALL return an empty-body 403 (not 500), so
+      empty-body 403 = unusable token; JSON-body 403 = ownership error (goes back to the model). Sync `httpx` (the
+      FastAPI endpoint runs in a threadpool; keeps the hand-written loop simple to read and test).
 - [ ] 3. Tools, argument validation, `periods` resolver + ~3 tests
 - [ ] 4. LLM interface, Gemini adapter, fake LLM for tests (pick `GEMINI_MODEL`, add `google-genai`)
 - [ ] 5. Agent loop + system prompt + ~5 tests (fake LLM, no real model in unit tests)
