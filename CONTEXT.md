@@ -314,30 +314,32 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
 
 **Checklist (one numbered item at a time, review after each):**
 
-- [x] 1. Scaffold: layout, config, `GET /health`, Dockerfile, README, CORS, `.env` git-ignored, 3 pytest tests
-- [x] 2. `SpringClient` (GET-only, JWT forwarding, allowlist, 403 mapping) + 4 tests. Verified live: no token,
-     garbage token, expired-but-validly-signed token, and unknown user ALL return an empty-body 403 (not 500)
-- [x] 3. Tools, argument validation, `periods` resolver + ~3 tests
-- [x] 4. LLM interface, Gemini adapter, fake LLM for tests. `google-genai` 2.30.1; model default
-      `gemini-3.8-flash` (override with `GEMINI_MODEL`; verified available by listing models with the real key;
-      others available: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-4-argon`). Uses the stateless classic
-      `client.models.generate_content` with SDK auto function-calling DISABLED (we run the loop). NOTE: Google's
-      docs now push a newer stateful "Interactions" API (`previous_interaction_id`); deliberately not used — it
-      would put conversation state on Google's side, against the stateless design. `app/llm.py` is the only module
-      that imports the SDK. Assistant turns carry an opaque `raw` replayed verbatim (Gemini 3 thought signatures).
-      Pydantic schemas are simplified (`anyOf [X,null]` -> X, drop title/default/additionalProperties). Verified
-      with one live two-turn tool round trip (right tool + args chosen, thought-signature replay accepted, answer
-      quoted only tool numbers). 2 tests; `tests/fakes.py::FakeLLM` for item 5.
-- [x] 5. Agent loop + system prompt + 6 tests (scripted `FakeLLM`; no real model in unit tests). `app/agent.py`
-      (hand-written loop: hard cap of 6 iterations, then one final tools-off call so the model must answer with
-      what it has; identical repeated tool calls are not re-executed; `SpringAuthError`/`SpringUnavailable`/
-      `LLMError` propagate), `app/prompts.py` (numbers only from tools, win/loss/neutral definitions, neutral = red
-      flag, overlapping setup tags, small samples, scope limits, no advice, journal text treated as untrusted
-      data, today's date + account list injected). Verified live with real Gemini + canned Spring data: a normal
-      question picked the right tool and quoted only tool numbers; the loss-streak question was declined with no
-      tool calls; a high-neutral dataset was flagged unprompted.
-- [ ] 6. `/chat` wiring, preflight, error handling + manual end-to-end run against local Spring with a real key
-- Target ~14 pytest tests for the whole phase.
+How the pieces connect: `POST /chat` → **Agent** (loop) ⇄ **Gemini** (`llm.py`) and → **ToolRunner**
+(`tools.py`) → **SpringClient** (`spring_client.py`) → Spring analytics API. Each step below builds one piece.
+
+- [x] 1. **Scaffold.** Service skeleton: `GET /health` (says whether a key is set, never shows it), settings
+      from env / `.env`, CORS, Dockerfile, README. `.env` is git-ignored. *3 tests.*
+- [x] 2. **`SpringClient` — the read-only door to Spring.** GET only, 5 allowed paths, forwards the user's JWT,
+      never stores or logs it. Sorts failures into three kinds: bad token (stop), refused (goes back to the
+      model, e.g. "not your account"), Spring down. *Checked live: a missing, garbage, expired, or unknown-user
+      token all return an empty 403, never a 500. 7 tests.*
+- [x] 3. **Tools + dates.** The 5 things the model may call (`list_accounts`, `get_summary`, `get_breakdown`,
+      `get_discipline`, `get_journal_entries`) with strict argument checks. `periods.py` turns "last month"
+      etc. into exact dates in Python, so the model never does date maths. Long journal results are cut off
+      with a `truncated` flag. *4 tests.*
+- [x] 4. **Gemini adapter.** `llm.py` is the only code that touches the Gemini SDK (default `gemini-3.8-flash`,
+      change with `GEMINI_MODEL`). Stateless `generate_content` with the SDK's auto-calling off, so we run the
+      loop ourselves. Google's newer stateful "Interactions" API is deliberately not used (it stores the
+      conversation on their side). *Checked live: one real tool round trip worked. 2 tests, plus a scripted
+      `FakeLLM` for later tests.*
+- [x] 5. **Agent loop + system prompt.** `agent.py`: model → tools → results → repeat. Max 6 rounds, then a
+      forced answer with no tools; a repeated identical call isn't re-run; a dead token stops everything.
+      `prompts.py`: use only tool numbers, win/loss/neutral rules, many neutral trades = red flag, what it
+      can't answer, journal text is data not instructions. *Checked live: a normal question was answered from
+      tool numbers, the loss-streak question was declined, high-neutral data was flagged. 6 tests.*
+- [ ] 6. **`/chat` endpoint.** Wire it together: JWT preflight (`GET /accounts`), map errors to HTTP statuses,
+      cap the history, then a real end-to-end run against local Spring.
+- Tests so far: 22 (the original target of ~14 grew with the adapter and loop).
 
 **Open questions:** confirm `TIMEZONE`; whether `gemini-3.8-flash` is the right cost/quality point (compare in Phase 3 evals); dashboard Discipline Score counts legacy `followedPlan = null`
 trades as "not followed" while `/analytics/discipline` reports them as "unspecified" — align or leave?
