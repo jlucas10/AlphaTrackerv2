@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     # No default and not required at startup: /health and the tests work
     # without it. It is checked when the LLM client is actually built.
     gemini_api_key: str | None = None
-    gemini_model: str | None = None
+    # A fast Flash-class model for tool calling. Verified available to this
+    # project's key by listing models from the API. Override with GEMINI_MODEL.
+    gemini_model: str = "gemini-3.8-flash"
 
     # Where the Spring API lives. The assistant only ever sends GET requests
     # here, forwarding the caller's JWT.
