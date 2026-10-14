@@ -5,20 +5,9 @@ import pytest
 from app.spring_client import ALLOWED_PATHS, SpringAuthError, SpringToolError
 from app.tools import MAX_PAYLOAD_CHARS, TOOLS, ToolRunner
 
+from tests.fakes import FakeSpring
+
 TODAY = date(2026, 10, 14)
-
-
-class FakeSpring:
-    """Stands in for SpringClient: records calls, returns or raises what it's told."""
-
-    def __init__(self, response=None, error=None):
-        self.response, self.error, self.calls = response, error, []
-
-    def get(self, path, token, params=None):
-        self.calls.append((path, token, params))
-        if self.error:
-            raise self.error
-        return self.response
 
 
 def runner(spring) -> ToolRunner:

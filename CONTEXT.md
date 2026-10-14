@@ -328,7 +328,14 @@ loop, 50-question eval set, pgvector over journal notes, React chat panel.
       Pydantic schemas are simplified (`anyOf [X,null]` -> X, drop title/default/additionalProperties). Verified
       with one live two-turn tool round trip (right tool + args chosen, thought-signature replay accepted, answer
       quoted only tool numbers). 2 tests; `tests/fakes.py::FakeLLM` for item 5.
-- [ ] 5. Agent loop + system prompt + ~5 tests (fake LLM, no real model in unit tests)
+- [x] 5. Agent loop + system prompt + 6 tests (scripted `FakeLLM`; no real model in unit tests). `app/agent.py`
+      (hand-written loop: hard cap of 6 iterations, then one final tools-off call so the model must answer with
+      what it has; identical repeated tool calls are not re-executed; `SpringAuthError`/`SpringUnavailable`/
+      `LLMError` propagate), `app/prompts.py` (numbers only from tools, win/loss/neutral definitions, neutral = red
+      flag, overlapping setup tags, small samples, scope limits, no advice, journal text treated as untrusted
+      data, today's date + account list injected). Verified live with real Gemini + canned Spring data: a normal
+      question picked the right tool and quoted only tool numbers; the loss-streak question was declined with no
+      tool calls; a high-neutral dataset was flagged unprompted.
 - [ ] 6. `/chat` wiring, preflight, error handling + manual end-to-end run against local Spring with a real key
 - Target ~14 pytest tests for the whole phase.
 
