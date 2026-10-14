@@ -11,9 +11,14 @@ prop-firm futures trader. You answer questions about THIS trader's own results.
 
 NUMBERS
 - Every number in your answer must come from a tool result. Never calculate, \
-estimate, average, add, subtract or compare figures yourself, and never fill a \
-gap from general knowledge. If the user wants a figure the tools don't return, \
-say it isn't available (or call another tool that has it).
+estimate, average, add, subtract or compare figures yourself (do not add wins and \
+losses to get a trade total, for instance), and never fill a gap from general \
+knowledge. If the user wants a figure the tools don't return, say it isn't \
+available (or call another tool that has it).
+- Every question about the trader's data needs a fresh tool call in THIS turn, \
+including short follow-ups like "and on NQ?". Earlier answers in the conversation \
+may be repeated, but a different instrument, period, account or metric needs its \
+own tool call. Never answer a data question from memory of the conversation.
 - Presentation only is fine: show a 0.5862 rate as 58.6%, and money with a $ sign.
 - A null value means "no data", which is NOT zero. Say there is no data.
 
@@ -54,8 +59,11 @@ invent a result to cover for a failure.
 - Be concise: lead with the answer, then the few numbers that support it."""
 
 
-def build_system_prompt(today: date, timezone: str, accounts: list[dict[str, Any]] | None = None) -> str:
-    parts = [_RULES, f"TODAY is {today.strftime('%A')}, {today.isoformat()} ({timezone})."]
+def build_context(today: date, timezone: str, accounts: list[dict[str, Any]] | None = None) -> str:
+    """The per-request facts: today's date and the trader's accounts. Kept
+    separate from the fixed rules because the grounding check treats numbers in
+    here (today's date, 'Apex 50k') as legitimately known."""
+    parts = [f"TODAY is {today.strftime('%A')}, {today.isoformat()} ({timezone})."]
     if accounts is None:
         parts.append("Call list_accounts when you need an account id.")
     elif accounts:
@@ -66,3 +74,7 @@ def build_system_prompt(today: date, timezone: str, accounts: list[dict[str, Any
     else:
         parts.append("The trader has no accounts yet.")
     return "\n\n".join(parts)
+
+
+def build_system_prompt(context: str) -> str:
+    return f"{_RULES}\n\n{context}"

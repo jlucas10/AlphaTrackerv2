@@ -86,6 +86,26 @@ def test_hitting_the_iteration_cap_forces_a_final_answer_with_no_tools_offered()
     assert "used all your tool calls" in final["system"]
 
 
+def test_an_answer_with_invented_figures_is_corrected_once_and_withheld_if_it_persists():
+    # First attempt invents "4 trades" with no tool call; told off, it calls the tool and answers properly.
+    llm = FakeLLM([answer("NQ: 4 trades, 50% win rate."), call(), answer("58.6% over 31 trades.")])
+    spring = FakeSpring(response=SUMMARY)
+
+    fixed = ask(agent_for(llm, spring))
+
+    assert fixed.answer == "58.6% over 31 trades."
+    assert [t.name for t in fixed.tool_calls] == ["get_summary"]
+    correction = llm.calls[1]["messages"][-1]
+    assert correction.role == "user" and "4" in correction.text and "Call the right tool" in correction.text
+
+    # A model that keeps inventing figures is not trusted: the answer is withheld, not shown.
+    stubborn = FakeLLM([answer("Exactly 4 trades."), answer("Still 4 trades, I am sure.")])
+    withheld = ask(agent_for(stubborn, FakeSpring()))
+
+    assert "couldn't verify" in withheld.answer and "4 trades" not in withheld.answer
+    assert withheld.unverified == [4.0]
+
+
 def test_a_dead_token_stops_the_loop_immediately():
     llm = FakeLLM([call(), answer("never reached")])
 
