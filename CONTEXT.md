@@ -337,9 +337,19 @@ How the pieces connect: `POST /chat` → **Agent** (loop) ⇄ **Gemini** (`llm.p
       `prompts.py`: use only tool numbers, win/loss/neutral rules, many neutral trades = red flag, what it
       can't answer, journal text is data not instructions. *Checked live: a normal question was answered from
       tool numbers, the loss-streak question was declined, high-neutral data was flagged. 6 tests.*
-- [ ] 6. **`/chat` endpoint.** Wire it together: JWT preflight (`GET /accounts`), map errors to HTTP statuses,
-      cap the history, then a real end-to-end run against local Spring.
-- Tests so far: 22 (the original target of ~14 grew with the adapter and loop).
+- [x] 6. **`/chat` endpoint + number check.** `POST /chat` takes `{message, history[]}` + `Authorization: Bearer`.
+      A cheap `GET /accounts` preflight rejects a bad token (401) *before* any model call is paid for, and
+      preloads the account list into the prompt. Errors map to 401 (bad token) / 503 (Spring down, or model
+      busy) / 502 (model failed or empty) / 422 (bad input), with no internals in the body. History is capped at
+      the last 20 turns and can only be user/assistant text. *Checked end to end:* real Spring + real Gemini,
+      a seeded trader with known answers; win rate, discipline, journal and total-trade answers all matched.
+      **The run caught a real failure:** a follow-up ("and how about on NQ?") made no tool call and Gemini
+      invented its numbers. Fixed two ways: a prompt rule (every data question needs a fresh tool call) and
+      `grounding.py`, which rejects any answer containing a figure that no tool result, question, or
+      context line contains. It is sent back once to be fixed, and withheld if it still fails. The check also
+      stops the model adding figures itself (it once wrote a "9 total trades" nobody returned). Cost: a
+      corrected answer takes one more round trip (~10s). 6 tests.
+- Tests: 28 (the original target of ~14 grew with the adapter, loop and number check).
 
 **Open questions:** confirm `TIMEZONE`; whether `gemini-3.8-flash` is the right cost/quality point (compare in Phase 3 evals); dashboard Discipline Score counts legacy `followedPlan = null`
 trades as "not followed" while `/analytics/discipline` reports them as "unspecified" — align or leave?

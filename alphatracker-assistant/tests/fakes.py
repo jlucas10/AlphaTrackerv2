@@ -4,14 +4,17 @@ from app.llm import LLMTurn, Message, ToolSpec
 class FakeSpring:
     """Stands in for SpringClient: records calls, returns or raises what it's told."""
 
-    def __init__(self, response=None, error=None):
-        self.response, self.error, self.calls = response, error, []
+    def __init__(self, response=None, error=None, by_path=None):
+        # `by_path` maps a Spring path to its response (or to an exception to raise);
+        # anything not listed falls back to `response` / `error`.
+        self.response, self.error, self.by_path, self.calls = response, error, by_path or {}, []
 
     def get(self, path, token, params=None):
         self.calls.append((path, token, params))
-        if self.error:
-            raise self.error
-        return self.response
+        outcome = self.by_path.get(path, self.error or self.response)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
 
 
 class FakeLLM:

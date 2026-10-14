@@ -1,13 +1,20 @@
+from typing import Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.chat import build_chat_router
 from app.config import Settings, get_settings
+from app.llm import LLM, build_llm
+from app.spring_client import SpringClient
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM | None = None) -> FastAPI:
     # A factory (rather than a module-level app built from global settings) so
-    # tests can build an app with exactly the configuration they want.
+    # tests can build an app with exactly the configuration - and fake Spring /
+    # fake model - they want.
     settings = settings or get_settings()
+    spring = spring or SpringClient(settings.spring_api_base_url)
     app = FastAPI(title="AlphaTracker Assistant")
 
     # The React app calls this service directly with the user's JWT. CORS is
@@ -21,6 +28,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
+
+    # The model client is built on first use, not at startup: /health and the
+    # tests work without a key, and a missing key becomes a clear 503 on /chat.
+    cache: dict[str, LLM] = {}
+
+    def get_llm() -> LLM:
+        if llm is not None:
+            return llm
+        if "llm" not in cache:
+            cache["llm"] = build_llm(settings)
+        return cache["llm"]
+
+    app.include_router(build_chat_router(settings, spring, get_llm))
 
     @app.get("/health")
     def health() -> dict[str, object]:
