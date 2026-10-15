@@ -354,9 +354,95 @@ How the pieces connect: `POST /chat` → **Agent** (loop) ⇄ **Gemini** (`llm.p
 **Open questions:** confirm `TIMEZONE`; whether `gemini-3.8-flash` is the right cost/quality point (compare in Phase 3 evals); dashboard Discipline Score counts legacy `followedPlan = null`
 trades as "not followed" while `/analytics/discipline` reports them as "unspecified" — align or leave?
 
-**Later phases (context only):** Phase 3 — 50-question eval set scored against these endpoints (include
-unanswerable questions; consider checking that every number in an answer appears in a tool result). Phase 4 —
-pgvector search over journal notes. Phase 5 — React chat panel.
+#### Phase 3 — Eval set (measure whether the assistant is right) — NEXT
+
+**Why:** Phase 2 was tested with a scripted fake model and one hand-run conversation; that run found a real
+failure (invented numbers on a follow-up) that no unit test would have. Evals make that kind of check
+repeatable, and let models/prompts be compared with numbers instead of impressions.
+
+**How it works (and why):**
+
+- **Independent answer key.** A fixed, hand-designed dataset (~48 trades, 2 accounts, tags, ratings, neutral
+  trades/days, journal notes). `evals/oracle.py` computes the correct answers in plain Python from the dataset.
+  (40 trades in the end, not the ~48 first planned.)
+  It is deliberately NOT built on the Java API or `app/*`: if the answer key came from Spring, a bug in Spring
+  would be "correct". Checking oracle == Spring on the same data also cross-tests the Java stats.
+- **Real stack, fixed clock.** The harness seeds a dedicated eval trader into local Spring through the public
+  endpoints, then runs the real `Agent` + real Gemini + real `SpringClient` in-process, with "today" pinned to a
+  constant so "this month" always means the same dates. It refuses to run against anything but localhost
+  (never seed the production DB).
+- **50 questions, ~9 categories:** summary by period/account, breakdowns (instrument/setup/rating), discipline,
+  journal, neutral handling, accounts, follow-ups with history, out-of-scope (must decline), adversarial
+  (injection in a journal note, asking for a derived stat, someone else's account).
+- **Scored by code, not by another model.** Each question lists the tools it must call, the figures that must
+  appear, figures that must NOT appear (catches the right-number-wrong-context failure the grounding check
+  can't), and whether it must decline. Every answer is also checked for withheld/ungrounded figures and leaked
+  tokens. Reports: pass rate per category, tool-selection accuracy, latency, tokens.
+- **Run-to-run noise:** `--repeat N` shows which questions pass only sometimes.
+- **Model comparison:** same set on `gemini-3.8-flash`, `gemini-3.5-flash-lite` (and maybe `gemini-4-argon`);
+  the default model is chosen from the table, not a guess.
+
+**Steps (one at a time, review after each):**
+
+- [x] 1. Dataset + oracle (pure Python, no network) + 3 tests. `evals/dataset.py`: 40 hand-designed trades
+      (2 accounts, 5 neutral trades, 6 neutral days incl. two made of offsetting trades, overlapping tags,
+      a 1-trade MCL group, 6 journal notes incl. a prompt-injection attempt), "today" pinned to 2026-10-14.
+      `evals/oracle.py`: the independent answer key (integer cents, exact half-up rounding, no imports from
+      `app/` or Spring). Tests pin it to figures worked out by hand and cross-check its date maths against
+      `app/periods.py` over 130+ days.
+- [ ] 2. Idempotent seeder (localhost-only guard) + `verify_oracle` (oracle vs live Spring across a grid of queries)
+- [ ] 3. The 50 questions with expectations (expected figures pulled from the oracle, never typed by hand)
+- [ ] 4. Runner + scorer + report (add token usage to `LLMTurn`); a few unit tests for the scorer
+- [ ] 5. Baseline run on the default model; fix real defects the evals expose (prompt / tools / grounding)
+- [ ] 6. Model comparison run; record the table here and pick the default model
+
+#### Phase 4 — Rate limiting (protect the Gemini key and your wallet) — PLANNED
+
+**Why:** each chat costs 1–3 Gemini calls, and any valid JWT can call `/chat`. Before the service is reachable
+from a browser, one runaway client or loop must not be able to burn the budget.
+
+**Design:**
+
+- **Per user, after authentication.** The limiter keys on the JWT `sub` (email). A JWT is only trusted after the
+  existing preflight `GET /accounts` succeeds (Spring verified the signature), so the key can't be spoofed with a
+  made-up token. Unauthenticated floods are cut off by that preflight, which is cheap.
+- **Two limits:** a short window (e.g. 10 chats/minute, stops loops) and a daily cap per user (e.g. 100), plus
+  one **global daily cap** so total spend is bounded no matter how many users exist. All configurable by env.
+- **429 + `Retry-After`** with a plain message; the chat panel shows "slow down" instead of a generic error.
+- **In-memory, single instance:** correct for one Railway container; resets on restart and does not span
+  replicas. Moving to Redis is the known upgrade if the service is ever scaled out. Stated, not hidden.
+- **Sprint 5 hook:** limits become per-tier (Free vs Pro) by reading the subscription from Spring later.
+- Steps: [ ] 1. limiter (sliding window, injectable clock) + tests  [ ] 2. wire into `/chat` before the model
+  call  [ ] 3. env settings + README  [ ] 4. live check that the 11th request in a minute gets a 429.
+
+#### Phase 5 — React chat panel + deployment — PLANNED
+
+**Goal:** use the assistant from the app. A slide-over panel on the dashboard/journal, opened from the sidebar.
+
+**Design:**
+
+- **Files:** `components/assistant/ChatPanel.tsx`, `hooks/useAssistant.ts` (owns messages, loading, errors),
+  `api/assistant.ts` (own axios instance pointed at `VITE_ASSISTANT_API_URL`, reusing the existing JWT).
+- **Conversation lives in the browser** (the service is stateless): the last 20 turns are sent with each
+  message; "Clear" resets it. Kept in memory / `sessionStorage`, not `localStorage` (trading notes are private).
+- **Answers render as Markdown** (the model emits bold/lists/headings) via `react-markdown`, with raw HTML
+  disabled so model/journal text can never inject markup.
+- **Shows its work:** a collapsed "Used: breakdown by instrument, this month" line per answer, from the
+  `tool_calls` the service already returns.
+- **Honest waiting and errors:** answers take 4–18 s (no streaming), so a "thinking…" state; 401 → prompts
+  re-login, 429 → "slow down" with the wait time, 502/503 → "assistant unavailable, try again".
+- **Starter questions** as chips so the first use is obvious; amber neutral styling stays consistent with the rest.
+- **Deployment:** assistant service as a second Railway service (root dir `alphatracker-assistant`, variables
+  `GEMINI_API_KEY`, `SPRING_API_BASE_URL`, `CORS_ALLOWED_ORIGINS`=the Vercel origin); Vercel gets
+  `VITE_ASSISTANT_API_URL`. Build the Dockerfile locally first (never run yet).
+- **Needs first:** Phase 4 (rate limiting) and the `TIMEZONE` decision.
+- Steps: [ ] 1. api + hook  [ ] 2. panel UI + Markdown  [ ] 3. error/loading states  [ ] 4. sidebar entry +
+  starter chips  [ ] 5. build Docker image, deploy service, set CORS + env vars  [ ] 6. live click-through.
+
+#### Phase 6 — pgvector search over journal notes — LATER (not scheduled)
+
+Semantic search over the trader's journal ("when did I write about revenge trading?"). Needs embeddings,
+a vector column/extension on Neon, and a new read-only tool. Design when Phases 3–5 are done.
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
