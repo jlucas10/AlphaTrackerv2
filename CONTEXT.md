@@ -390,7 +390,14 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
       `evals/oracle.py`: the independent answer key (integer cents, exact half-up rounding, no imports from
       `app/` or Spring). Tests pin it to figures worked out by hand and cross-check its date maths against
       `app/periods.py` over 130+ days.
-- [ ] 2. Idempotent seeder (localhost-only guard) + `verify_oracle` (oracle vs live Spring across a grid of queries)
+- [x] 2. Seeder + `verify_oracle` + 2 tests. `python -m evals.seed` loads the dataset into LOCAL Spring through
+      the public endpoints (fixed eval trader `eval-harness@example.test`; idempotent: reuses accounts by name,
+      deletes+recreates trades, resets journal; refuses any non-localhost host by exact hostname match). Write
+      code lives in `evals/` so it never ships (Dockerfile copies only `app/`). `python -m evals.verify_oracle`
+      compares Spring with the oracle on 111 queries (every period x account for summary, 3 breakdowns,
+      discipline; journal ranges; account balances). **Result: Spring and the oracle agree on all 111.** The
+      checker was shown to have teeth (a deliberately wrong oracle produced 411 mismatches) and the seeder to be
+      idempotent (second run still 40 trades). The eval trader stays in your local DB between runs by design.
 - [ ] 3. The 50 questions with expectations (expected figures pulled from the oracle, never typed by hand)
 - [ ] 4. Runner + scorer + report (add token usage to `LLMTurn`); a few unit tests for the scorer
 - [ ] 5. Baseline run on the default model; fix real defects the evals expose (prompt / tools / grounding)

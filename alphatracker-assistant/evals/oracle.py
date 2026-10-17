@@ -22,7 +22,7 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
 
-from evals.dataset import JOURNAL, TODAY, TRADES, SeedTrade
+from evals.dataset import ACCOUNTS, JOURNAL, TODAY, TRADES, SeedTrade
 
 # CME point values: dollars per 1.00 of price move, per contract. A second,
 # independent copy of the table in Instrument.java.
@@ -161,6 +161,12 @@ def discipline(trades: list[SeedTrade]) -> dict:
         "brokePlan": stats(broke),
         "unspecified": stats([]),  # the API cannot create a null flag, so the dataset has none
     }
+
+
+def account_balance(account: str) -> float:
+    """Starting balance plus every trade's P&L - what Spring's balance sync should end up at."""
+    spec = ACCOUNTS[account]
+    return spec.starting_balance + _dollars(sum(pnl_cents(t) for t in TRADES if t.account == account))
 
 
 def journal(start: date, end: date) -> list[dict]:
