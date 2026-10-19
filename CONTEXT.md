@@ -318,37 +318,37 @@ How the pieces connect: `POST /chat` → **Agent** (loop) ⇄ **Gemini** (`llm.p
 (`tools.py`) → **SpringClient** (`spring_client.py`) → Spring analytics API. Each step below builds one piece.
 
 - [x] 1. **Scaffold.** Service skeleton: `GET /health` (says whether a key is set, never shows it), settings
-      from env / `.env`, CORS, Dockerfile, README. `.env` is git-ignored. *3 tests.*
+     from env / `.env`, CORS, Dockerfile, README. `.env` is git-ignored. _3 tests._
 - [x] 2. **`SpringClient` — the read-only door to Spring.** GET only, 5 allowed paths, forwards the user's JWT,
-      never stores or logs it. Sorts failures into three kinds: bad token (stop), refused (goes back to the
-      model, e.g. "not your account"), Spring down. *Checked live: a missing, garbage, expired, or unknown-user
-      token all return an empty 403, never a 500. 7 tests.*
+     never stores or logs it. Sorts failures into three kinds: bad token (stop), refused (goes back to the
+     model, e.g. "not your account"), Spring down. _Checked live: a missing, garbage, expired, or unknown-user
+     token all return an empty 403, never a 500. 7 tests._
 - [x] 3. **Tools + dates.** The 5 things the model may call (`list_accounts`, `get_summary`, `get_breakdown`,
-      `get_discipline`, `get_journal_entries`) with strict argument checks. `periods.py` turns "last month"
-      etc. into exact dates in Python, so the model never does date maths. Long journal results are cut off
-      with a `truncated` flag. *4 tests.*
+     `get_discipline`, `get_journal_entries`) with strict argument checks. `periods.py` turns "last month"
+     etc. into exact dates in Python, so the model never does date maths. Long journal results are cut off
+     with a `truncated` flag. _4 tests._
 - [x] 4. **Gemini adapter.** `llm.py` is the only code that touches the Gemini SDK (default `gemini-3.8-flash`,
-      change with `GEMINI_MODEL`). Stateless `generate_content` with the SDK's auto-calling off, so we run the
-      loop ourselves. Google's newer stateful "Interactions" API is deliberately not used (it stores the
-      conversation on their side). *Checked live: one real tool round trip worked. 2 tests, plus a scripted
-      `FakeLLM` for later tests.*
+     change with `GEMINI_MODEL`). Stateless `generate_content` with the SDK's auto-calling off, so we run the
+     loop ourselves. Google's newer stateful "Interactions" API is deliberately not used (it stores the
+     conversation on their side). _Checked live: one real tool round trip worked. 2 tests, plus a scripted
+     `FakeLLM` for later tests._
 - [x] 5. **Agent loop + system prompt.** `agent.py`: model → tools → results → repeat. Max 6 rounds, then a
-      forced answer with no tools; a repeated identical call isn't re-run; a dead token stops everything.
-      `prompts.py`: use only tool numbers, win/loss/neutral rules, many neutral trades = red flag, what it
-      can't answer, journal text is data not instructions. *Checked live: a normal question was answered from
-      tool numbers, the loss-streak question was declined, high-neutral data was flagged. 6 tests.*
+     forced answer with no tools; a repeated identical call isn't re-run; a dead token stops everything.
+     `prompts.py`: use only tool numbers, win/loss/neutral rules, many neutral trades = red flag, what it
+     can't answer, journal text is data not instructions. _Checked live: a normal question was answered from
+     tool numbers, the loss-streak question was declined, high-neutral data was flagged. 6 tests._
 - [x] 6. **`/chat` endpoint + number check.** `POST /chat` takes `{message, history[]}` + `Authorization: Bearer`.
-      A cheap `GET /accounts` preflight rejects a bad token (401) *before* any model call is paid for, and
-      preloads the account list into the prompt. Errors map to 401 (bad token) / 503 (Spring down, or model
-      busy) / 502 (model failed or empty) / 422 (bad input), with no internals in the body. History is capped at
-      the last 20 turns and can only be user/assistant text. *Checked end to end:* real Spring + real Gemini,
-      a seeded trader with known answers; win rate, discipline, journal and total-trade answers all matched.
-      **The run caught a real failure:** a follow-up ("and how about on NQ?") made no tool call and Gemini
-      invented its numbers. Fixed two ways: a prompt rule (every data question needs a fresh tool call) and
-      `grounding.py`, which rejects any answer containing a figure that no tool result, question, or
-      context line contains. It is sent back once to be fixed, and withheld if it still fails. The check also
-      stops the model adding figures itself (it once wrote a "9 total trades" nobody returned). Cost: a
-      corrected answer takes one more round trip (~10s). 6 tests.
+     A cheap `GET /accounts` preflight rejects a bad token (401) _before_ any model call is paid for, and
+     preloads the account list into the prompt. Errors map to 401 (bad token) / 503 (Spring down, or model
+     busy) / 502 (model failed or empty) / 422 (bad input), with no internals in the body. History is capped at
+     the last 20 turns and can only be user/assistant text. _Checked end to end:_ real Spring + real Gemini,
+     a seeded trader with known answers; win rate, discipline, journal and total-trade answers all matched.
+     **The run caught a real failure:** a follow-up ("and how about on NQ?") made no tool call and Gemini
+     invented its numbers. Fixed two ways: a prompt rule (every data question needs a fresh tool call) and
+     `grounding.py`, which rejects any answer containing a figure that no tool result, question, or
+     context line contains. It is sent back once to be fixed, and withheld if it still fails. The check also
+     stops the model adding figures itself (it once wrote a "9 total trades" nobody returned). Cost: a
+     corrected answer takes one more round trip (~10s). 6 tests.
 - Tests: 28 (the original target of ~14 grew with the adapter, loop and number check).
 
 **Open questions:** confirm `TIMEZONE`; whether `gemini-3.8-flash` is the right cost/quality point (compare in Phase 3 evals); dashboard Discipline Score counts legacy `followedPlan = null`
@@ -385,19 +385,17 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
 **Steps (one at a time, review after each):**
 
 - [x] 1. Dataset + oracle (pure Python, no network) + 3 tests. `evals/dataset.py`: 40 hand-designed trades
-      (2 accounts, 5 neutral trades, 6 neutral days incl. two made of offsetting trades, overlapping tags,
-      a 1-trade MCL group, 6 journal notes incl. a prompt-injection attempt), "today" pinned to 2026-10-14.
-      `evals/oracle.py`: the independent answer key (integer cents, exact half-up rounding, no imports from
-      `app/` or Spring). Tests pin it to figures worked out by hand and cross-check its date maths against
-      `app/periods.py` over 130+ days.
+     (2 accounts, 5 neutral trades, 6 neutral days incl. two made of offsetting trades, overlapping tags,
+     a 1-trade MCL group, 6 journal notes incl. a prompt-injection attempt), "today" pinned to 2026-10-14.
+     `evals/oracle.py`: the independent answer key (integer cents, exact half-up rounding, no imports from
+     `app/` or Spring). Tests pin it to figures worked out by hand and cross-check its date maths against
+     `app/periods.py` over 130+ days.
 - [x] 2. Seeder + `verify_oracle` + 2 tests. `python -m evals.seed` loads the dataset into LOCAL Spring through
-      the public endpoints (fixed eval trader `eval-harness@example.test`; idempotent: reuses accounts by name,
-      deletes+recreates trades, resets journal; refuses any non-localhost host by exact hostname match). Write
-      code lives in `evals/` so it never ships (Dockerfile copies only `app/`). `python -m evals.verify_oracle`
-      compares Spring with the oracle on 111 queries (every period x account for summary, 3 breakdowns,
-      discipline; journal ranges; account balances). **Result: Spring and the oracle agree on all 111.** The
-      checker was shown to have teeth (a deliberately wrong oracle produced 411 mismatches) and the seeder to be
-      idempotent (second run still 40 trades). The eval trader stays in your local DB between runs by design.
+     the public endpoints (fixed eval trader `eval-harness@example.test`; idempotent: reuses accounts by name,
+     deletes+recreates trades, resets journal; refuses any non-localhost host by exact hostname match). Write
+     code lives in `evals/` so it never ships (Dockerfile copies only `app/`). `python -m evals.verify_oracle`
+     compares Spring with the oracle on 111 queries (every period x account for summary, 3 breakdowns,
+     discipline; journal ranges; account balances). **Result: Spring and the oracle agree on all 111.**
 - [ ] 3. The 50 questions with expectations (expected figures pulled from the oracle, never typed by hand)
 - [ ] 4. Runner + scorer + report (add token usage to `LLMTurn`); a few unit tests for the scorer
 - [ ] 5. Baseline run on the default model; fix real defects the evals expose (prompt / tools / grounding)
@@ -419,8 +417,8 @@ from a browser, one runaway client or loop must not be able to burn the budget.
 - **In-memory, single instance:** correct for one Railway container; resets on restart and does not span
   replicas. Moving to Redis is the known upgrade if the service is ever scaled out. Stated, not hidden.
 - **Sprint 5 hook:** limits become per-tier (Free vs Pro) by reading the subscription from Spring later.
-- Steps: [ ] 1. limiter (sliding window, injectable clock) + tests  [ ] 2. wire into `/chat` before the model
-  call  [ ] 3. env settings + README  [ ] 4. live check that the 11th request in a minute gets a 429.
+- Steps: [ ] 1. limiter (sliding window, injectable clock) + tests [ ] 2. wire into `/chat` before the model
+  call [ ] 3. env settings + README [ ] 4. live check that the 11th request in a minute gets a 429.
 
 #### Phase 5 — React chat panel + deployment — PLANNED
 
@@ -443,8 +441,8 @@ from a browser, one runaway client or loop must not be able to burn the budget.
   `GEMINI_API_KEY`, `SPRING_API_BASE_URL`, `CORS_ALLOWED_ORIGINS`=the Vercel origin); Vercel gets
   `VITE_ASSISTANT_API_URL`. Build the Dockerfile locally first (never run yet).
 - **Needs first:** Phase 4 (rate limiting) and the `TIMEZONE` decision.
-- Steps: [ ] 1. api + hook  [ ] 2. panel UI + Markdown  [ ] 3. error/loading states  [ ] 4. sidebar entry +
-  starter chips  [ ] 5. build Docker image, deploy service, set CORS + env vars  [ ] 6. live click-through.
+- Steps: [ ] 1. api + hook [ ] 2. panel UI + Markdown [ ] 3. error/loading states [ ] 4. sidebar entry +
+  starter chips [ ] 5. build Docker image, deploy service, set CORS + env vars [ ] 6. live click-through.
 
 #### Phase 6 — pgvector search over journal notes — LATER (not scheduled)
 
