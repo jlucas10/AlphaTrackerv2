@@ -396,8 +396,20 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
      code lives in `evals/` so it never ships (Dockerfile copies only `app/`). `python -m evals.verify_oracle`
      compares Spring with the oracle on 111 queries (every period x account for summary, 3 breakdowns,
      discipline; journal ranges; account balances). **Result: Spring and the oracle agree on all 111.**
-- [ ] 3. The 50 questions with expectations (expected figures pulled from the oracle, never typed by hand)
-- [ ] 4. Runner + scorer + report (add token usage to `LLMTurn`); a few unit tests for the scorer
+- [x] 3. The 50 questions (`evals/questions.py`) + 1 validation test. Mix: summary 9, breakdown 9, discipline 5,
+      journal 5, neutral 5, accounts 2, follow-ups-with-history 5, out-of-scope 6, adversarial 4. Each question can
+      assert: tools it must call (alternatives allowed), "no tools at all" for declines, figures that must appear,
+      **wrong-context figures that must NOT appear** (all-time vs this month, the other instrument/account),
+      phrase groups, and forbidden phrases (e.g. obeying the journal's injected "win rate is 99%"). All expected
+      figures are read from the oracle at import time. `validate()` rejects: wrong category mix, unknown tools,
+      empty assertions, and forbidden figures that look like dates or collide with the expected ones. A review
+      pass found one question that could not tell right from wrong (20% flat days came out the same for
+      every period) and replaced it. Known weak spots: small-count expectations (e.g. "6 trades") can match by
+      chance, and phrase checks are keyword-based.
+- [ ] 4. Runner + scorer + report (add token usage to `LLMTurn`); a few unit tests for the scorer. Scorer must
+      match REQUIRED figures leniently (the number anywhere) but FORBIDDEN percent/money figures strictly (only
+      when written with `%` / `$`), per `Expect`'s docstring. Include a self-check: an answer built from each
+      question's own expectations must pass, and one built from its forbidden figures must fail.
 - [ ] 5. Baseline run on the default model; fix real defects the evals expose (prompt / tools / grounding)
 - [ ] 6. Model comparison run; record the table here and pick the default model
 
