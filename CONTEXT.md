@@ -406,10 +406,18 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
       pass found one question that could not tell right from wrong (20% flat days came out the same for
       every period) and replaced it. Known weak spots: small-count expectations (e.g. "6 trades") can match by
       chance, and phrase checks are keyword-based.
-- [ ] 4. Runner + scorer + report (add token usage to `LLMTurn`); a few unit tests for the scorer. Scorer must
-      match REQUIRED figures leniently (the number anywhere) but FORBIDDEN percent/money figures strictly (only
-      when written with `%` / `$`), per `Expect`'s docstring. Include a self-check: an answer built from each
-      question's own expectations must pass, and one built from its forbidden figures must fail.
+- [x] 4. Runner + scorer + report + 4 tests. `python -m evals.run [--model M] [--repeat N] [--category C] [--id Q]`.
+      Runs the REAL stack (seeded local Spring, real model) with "today" pinned, through the same
+      `answer_question` the `/chat` endpoint now uses (extracted from the endpoint so evals test production, not a
+      lookalike; the endpoint tests guarded the refactor). `scorer.py`: pure, deterministic, every requirement a
+      named check; REQUIRED figures match leniently (the number anywhere), FORBIDDEN percent/money figures match
+      strictly (needs `%` / `$`), so "September 20" can't trip a forbidden 20%. Self-check test: for all 50 questions
+      an answer built from its own expectations passes and 6 kinds of wrong answer fail (forbidden figure, no tool
+      call, failed tool call, decline that fetched data, missing figure/phrase, withheld). `MeteredLLM` counts model
+      calls/tokens/time from outside the agent; the Gemini adapter now reports token usage. `report.py`: pass
+      rate overall and per category, tool accuracy, flaky / always-fail lists, latency median+p95, tokens.
+      Results go to `evals/results/` (git-ignored). Smoke run on 3 questions passed, including the follow-up that
+      once failed. Typical cost observed: ~2 model calls and ~5k tokens in / 0.5k out per question, 4-7s.
 - [ ] 5. Baseline run on the default model; fix real defects the evals expose (prompt / tools / grounding)
 - [ ] 6. Model comparison run; record the table here and pick the default model
 
