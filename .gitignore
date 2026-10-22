@@ -48,3 +48,4 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+alphatracker-assistant/evals/results/

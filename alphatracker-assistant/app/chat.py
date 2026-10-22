@@ -1,12 +1,13 @@
 import logging
-from typing import Annotated, Any, Callable
+from datetime import date
+from typing import Annotated, Any, Callable, Iterable
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.agent import Agent, AgentError
+from app.agent import Agent, AgentError, AgentResult
 from app.config import Settings
-from app.llm import LLM, LLMError, Message
+from app.llm import LLM, AssistantNotConfigured, LLMError, Message
 from app.periods import today_in
 from app.prompts import build_context, build_system_prompt
 from app.spring_client import SpringAuthError, SpringUnavailable
@@ -56,28 +57,14 @@ def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM
         token = _bearer_token(authorization)
 
         try:
-            # Preflight. It proves the JWT is good BEFORE any model call is paid for
-            # (a bad token costs one cheap GET, not a Gemini request), and the result
-            # preloads the trader's accounts into the prompt so "my Apex account" resolves.
-            accounts = spring.get("/accounts", token)
-
-            try:
-                llm = get_llm()
-            except RuntimeError:
-                raise HTTPException(503, "The assistant isn't configured on the server.") from None
-
-            context = build_context(
-                today_in(settings.timezone),
-                settings.timezone,
-                accounts if isinstance(accounts, list) else None,
+            result = answer_question(
+                settings=settings, spring=spring, runner=runner, get_llm=get_llm, token=token,
+                message=request.message,
+                history=to_messages((t.role, t.content) for t in request.history),
+                today=today_in(settings.timezone),
             )
-            result = Agent(llm, runner).run(
-                system=build_system_prompt(context),
-                context_text=context,
-                history=_to_messages(request.history),
-                user_message=request.message,
-                token=token,
-            )
+        except AssistantNotConfigured:
+            raise HTTPException(503, "The assistant isn't configured on the server.") from None
         except SpringAuthError:
             raise HTTPException(401, "Your session has expired or is invalid. Please log in again.",
                                 headers={"WWW-Authenticate": "Bearer"}) from None
@@ -102,6 +89,38 @@ def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM
     return router
 
 
+def answer_question(
+    *,
+    settings: Settings,
+    spring: Any,
+    runner: ToolRunner,
+    get_llm: Callable[[], LLM],
+    token: str,
+    message: str,
+    history: list[Message],
+    today: date,
+) -> AgentResult:
+    """The whole path from a question to a checked answer.
+
+    Shared by the /chat endpoint and the eval harness on purpose: the evals then
+    exercise exactly what production runs (same preflight, same prompt, same loop)
+    instead of a lookalike that could drift away from it.
+    """
+    # Preflight. It proves the JWT is good BEFORE any model call is paid for (a bad
+    # token costs one cheap GET, not a Gemini request), and the result preloads the
+    # trader's accounts into the prompt so "my Apex account" resolves.
+    accounts = spring.get("/accounts", token)
+    llm = get_llm()
+    context = build_context(today, settings.timezone, accounts if isinstance(accounts, list) else None)
+    return Agent(llm, runner).run(
+        system=build_system_prompt(context),
+        context_text=context,
+        history=history,
+        user_message=message,
+        token=token,
+    )
+
+
 def _bearer_token(authorization: str | None) -> str:
     scheme, _, token = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
@@ -109,10 +128,11 @@ def _bearer_token(authorization: str | None) -> str:
     return token.strip()
 
 
-def _to_messages(history: list[HistoryTurn]) -> list[Message]:
-    recent = history[-MAX_HISTORY_TURNS:]
+def to_messages(turns: Iterable[tuple[str, str]]) -> list[Message]:
+    """(role, content) pairs -> the last MAX_HISTORY_TURNS as Messages."""
+    recent = list(turns)[-MAX_HISTORY_TURNS:]
     # Cutting to the last N can leave the conversation starting on an assistant
     # turn, which would confuse the model; start from the first user turn instead.
-    while recent and recent[0].role != "user":
+    while recent and recent[0][0] != "user":
         recent = recent[1:]
-    return [Message(t.role, text=t.content) for t in recent]  # type: ignore[arg-type]
+    return [Message(role, text=content) for role, content in recent]  # type: ignore[arg-type]

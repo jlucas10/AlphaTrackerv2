@@ -1,7 +1,7 @@
 import pytest
 from google.genai import errors, types
 
-from app.llm import GeminiLLM, LLMError, Message, ToolCall, ToolResultMsg, ToolSpec, simplify_schema
+from app.llm import GeminiLLM, LLMError, Message, ToolCall, ToolResultMsg, ToolSpec, Usage, simplify_schema
 from app.tools import TOOLS
 
 
@@ -55,7 +55,10 @@ def test_gemini_adapter_converts_messages_parses_replies_and_maps_errors():
             types.Part(function_call=types.FunctionCall(name="get_summary", args={"period": "this_month"}, id="c1")),
         ],
     )
-    client = StubClient(types.GenerateContentResponse(candidates=[types.Candidate(content=reply)]))
+    client = StubClient(types.GenerateContentResponse(
+        candidates=[types.Candidate(content=reply)],
+        usage_metadata=types.GenerateContentResponseUsageMetadata(prompt_token_count=120, total_token_count=200),
+    ))
     earlier_model_turn = types.Content(role="model", parts=[types.Part(text="signed turn")])
     messages = [
         Message("user", text="win rate?"),
@@ -70,6 +73,8 @@ def test_gemini_adapter_converts_messages_parses_replies_and_maps_errors():
     assert turn.text == "Checking."
     assert turn.tool_calls == [ToolCall("get_summary", {"period": "this_month"}, "c1")]
     assert turn.raw is reply
+    # Billing counts everything beyond the prompt (answer + hidden thinking) as output.
+    assert turn.usage == Usage(prompt_tokens=120, output_tokens=80)
 
     # Request: manual loop (SDK auto-calling off), model + system prompt passed through,
     # an assistant turn with raw content is replayed untouched, and tool results ride in a user turn.
