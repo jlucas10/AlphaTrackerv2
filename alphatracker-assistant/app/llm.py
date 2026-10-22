@@ -19,6 +19,17 @@ class LLMError(Exception):
         self.retryable = retryable
 
 
+class AssistantNotConfigured(RuntimeError):
+    """The server has no model key. An operator problem, not something the caller did,
+    and a distinct type so it can't be confused with an unrelated RuntimeError."""
+
+
+@dataclass(frozen=True)
+class Usage:
+    prompt_tokens: int = 0
+    output_tokens: int = 0  # includes the model's hidden "thinking" tokens, which are billed as output
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     name: str
@@ -57,6 +68,7 @@ class LLMTurn:
     text: str | None
     tool_calls: list[ToolCall]
     raw: Any = None
+    usage: Usage | None = None
 
 
 class LLM(Protocol):
@@ -171,12 +183,21 @@ class GeminiLLM:
             for p in content.parts
             if p.function_call
         ]
-        return LLMTurn(text=text, tool_calls=calls, raw=content)
+        return LLMTurn(text=text, tool_calls=calls, raw=content, usage=_usage(response))
+
+
+def _usage(response: Any) -> Usage | None:
+    meta = getattr(response, "usage_metadata", None)
+    if meta is None or meta.total_token_count is None:
+        return None
+    prompt = meta.prompt_token_count or 0
+    # Everything billed beyond the prompt: the visible answer plus hidden thinking tokens.
+    return Usage(prompt_tokens=prompt, output_tokens=max(meta.total_token_count - prompt, 0))
 
 
 def build_llm(settings: Settings) -> GeminiLLM:
     if not settings.gemini_api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set. Add it to alphatracker-assistant/.env.")
+        raise AssistantNotConfigured("GEMINI_API_KEY is not set. Add it to alphatracker-assistant/.env.")
     from google import genai
 
     return GeminiLLM(settings.gemini_model, genai.Client(api_key=settings.gemini_api_key))
