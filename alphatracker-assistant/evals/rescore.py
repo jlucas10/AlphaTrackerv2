@@ -15,12 +15,13 @@ from pathlib import Path
 
 from app.agent import ToolCallRecord
 from evals.questions import QUESTIONS
+from evals.questions_blind import BLIND_QUESTIONS
 from evals.report import Attempt, QuestionResult, render_markdown, summarize
 from evals.scorer import score
 
 
 def rescore(data: dict) -> tuple[list[QuestionResult], list[str]]:
-    questions = {q.id: q for q in QUESTIONS}
+    questions = {q.id: q for q in (*QUESTIONS, *BLIND_QUESTIONS)}
     results: list[QuestionResult] = []
     flips: list[str] = []
 

@@ -25,7 +25,8 @@ from app.spring_client import SpringClient, SpringUnavailable
 from app.tools import ToolRunner
 from evals.dataset import TODAY
 from evals.metered import MeteredLLM
-from evals.questions import QUESTIONS, validate
+from evals.questions import CATEGORIES, QUESTIONS, validate
+from evals.questions_blind import BLIND_QUESTIONS
 from evals.report import Attempt, QuestionResult, render_markdown, summarize
 from evals.scorer import score
 from evals.seed import seed
@@ -79,14 +80,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Score the assistant against the eval set.")
     parser.add_argument("--model", help="Gemini model id (default: GEMINI_MODEL / the app default)")
     parser.add_argument("--repeat", type=int, default=1, help="attempts per question; >1 exposes flaky answers")
+    parser.add_argument("--set", dest="which", choices=("main", "blind"), default="main",
+                        help="main = the 50 tuned questions; blind = the 18 never tuned against")
     parser.add_argument("--category", help="only this category")
     parser.add_argument("--id", dest="ids", action="append", help="only this question id (repeatable)")
     parser.add_argument("--spring-url", default=Settings().spring_api_base_url)
     parser.add_argument("--out", type=Path, default=RESULTS_DIR)
     args = parser.parse_args()
 
-    validate(QUESTIONS)
-    questions = [q for q in QUESTIONS
+    chosen = QUESTIONS if args.which == "main" else BLIND_QUESTIONS
+    validate(chosen, CATEGORIES if args.which == "main" else None)
+    questions = [q for q in chosen
                  if (not args.category or q.category == args.category) and (not args.ids or q.id in args.ids)]
     if not questions:
         raise SystemExit("No questions match those filters.")
@@ -113,8 +117,8 @@ def main() -> None:
         results.append(QuestionResult(q.id, q.category, q.text, attempts))
 
     summary = summarize(results)
-    meta = {"model": model, "repeat": args.repeat, "when": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "today_pinned": TODAY.isoformat()}
+    meta = {"model": f"{model} [{args.which} set]", "repeat": args.repeat,
+            "when": datetime.now().strftime("%Y-%m-%d %H:%M"), "today_pinned": TODAY.isoformat()}
     report = render_markdown(summary, meta, results)
 
     args.out.mkdir(parents=True, exist_ok=True)

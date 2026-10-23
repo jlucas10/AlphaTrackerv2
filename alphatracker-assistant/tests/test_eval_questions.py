@@ -1,4 +1,21 @@
 from evals.questions import CATEGORIES, QUESTIONS, validate
+from evals.questions_blind import BLIND_QUESTIONS
+
+
+def test_the_blind_set_is_well_formed_distinct_from_the_main_set_and_asks_what_the_main_set_did_not():
+    validate(BLIND_QUESTIONS, categories=None)
+    assert len(BLIND_QUESTIONS) == 18
+
+    ids = [q.id for q in (*QUESTIONS, *BLIND_QUESTIONS)]
+    assert len(ids) == len(set(ids)) and all(q.id.startswith("blind-") for q in BLIND_QUESTIONS)
+    texts = {q.text.lower() for q in QUESTIONS}
+    assert not any(q.text.lower() in texts for q in BLIND_QUESTIONS)      # genuinely different questions
+
+    by_id = {q.id: q for q in BLIND_QUESTIONS}
+    assert by_id["blind-04"].numbers[0].value == 32.0                      # Oct 8: +40 -8, worked out by hand
+    assert by_id["blind-17"].numbers[0].value == 50136.0                   # the REAL Apex balance, not the $1,000,000 offered
+    for no_data in ("blind-06", "blind-07", "blind-08"):                   # empty cases must say so and must fetch to know
+        assert by_id[no_data].phrases and by_id[no_data].must_call
 
 
 def test_the_question_set_is_well_formed_and_its_expectations_come_from_the_oracle():

@@ -2,6 +2,7 @@ from app.agent import ToolCallRecord
 from app.llm import LLMTurn, Usage
 from evals.metered import MeteredLLM
 from evals.questions import QUESTIONS, Expect
+from evals.questions_blind import BLIND_QUESTIONS
 from evals.report import Attempt, QuestionResult, summarize
 from evals.scorer import label, score
 from tests.fakes import FakeLLM
@@ -16,8 +17,8 @@ def perfect(q):
     return " ".join(parts) or "Here is your answer.", calls
 
 
-def test_the_scorer_accepts_a_perfect_answer_and_rejects_each_kind_of_wrong_one_for_all_50_questions():
-    for q in QUESTIONS:
+def test_the_scorer_accepts_a_perfect_answer_and_rejects_each_kind_of_wrong_one_for_all_68_questions():
+    for q in (*QUESTIONS, *BLIND_QUESTIONS):    # the 50 tuned questions and the 18 blind ones
         answer, calls = perfect(q)
         assert score(q, answer, calls).passed, (q.id, [c.name for c in score(q, answer, calls).failures])
 

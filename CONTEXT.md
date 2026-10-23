@@ -397,57 +397,68 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
      compares Spring with the oracle on 111 queries (every period x account for summary, 3 breakdowns,
      discipline; journal ranges; account balances). **Result: Spring and the oracle agree on all 111.**
 - [x] 3. The 50 questions (`evals/questions.py`) + 1 validation test. Mix: summary 9, breakdown 9, discipline 5,
-      journal 5, neutral 5, accounts 2, follow-ups-with-history 5, out-of-scope 6, adversarial 4. Each question can
-      assert: tools it must call (alternatives allowed), "no tools at all" for declines, figures that must appear,
-      **wrong-context figures that must NOT appear** (all-time vs this month, the other instrument/account),
-      phrase groups, and forbidden phrases (e.g. obeying the journal's injected "win rate is 99%"). All expected
-      figures are read from the oracle at import time. `validate()` rejects: wrong category mix, unknown tools,
-      empty assertions, and forbidden figures that look like dates or collide with the expected ones. A review
-      pass found one question that could not tell right from wrong (20% flat days came out the same for
-      every period) and replaced it. Known weak spots: small-count expectations (e.g. "6 trades") can match by
-      chance, and phrase checks are keyword-based.
+     journal 5, neutral 5, accounts 2, follow-ups-with-history 5, out-of-scope 6, adversarial 4. Each question can
+     assert: tools it must call (alternatives allowed), "no tools at all" for declines, figures that must appear,
+     **wrong-context figures that must NOT appear** (all-time vs this month, the other instrument/account),
+     phrase groups, and forbidden phrases (e.g. obeying the journal's injected "win rate is 99%"). All expected
+     figures are read from the oracle at import time. `validate()` rejects: wrong category mix, unknown tools,
+     empty assertions, and forbidden figures that look like dates or collide with the expected ones. A review
+     pass found one question that could not tell right from wrong (20% flat days came out the same for
+     every period) and replaced it. Known weak spots: small-count expectations (e.g. "6 trades") can match by
+     chance, and phrase checks are keyword-based.
 - [x] 4. Runner + scorer + report + 4 tests. `python -m evals.run [--model M] [--repeat N] [--category C] [--id Q]`.
-      Runs the REAL stack (seeded local Spring, real model) with "today" pinned, through the same
-      `answer_question` the `/chat` endpoint now uses (extracted from the endpoint so evals test production, not a
-      lookalike; the endpoint tests guarded the refactor). `scorer.py`: pure, deterministic, every requirement a
-      named check; REQUIRED figures match leniently (the number anywhere), FORBIDDEN percent/money figures match
-      strictly (needs `%` / `$`), so "September 20" can't trip a forbidden 20%. Self-check test: for all 50 questions
-      an answer built from its own expectations passes and 6 kinds of wrong answer fail (forbidden figure, no tool
-      call, failed tool call, decline that fetched data, missing figure/phrase, withheld). `MeteredLLM` counts model
-      calls/tokens/time from outside the agent; the Gemini adapter now reports token usage. `report.py`: pass
-      rate overall and per category, tool accuracy, flaky / always-fail lists, latency median+p95, tokens.
-      Results go to `evals/results/` (git-ignored). Smoke run on 3 questions passed, including the follow-up that
-      once failed. Typical cost observed: ~2 model calls and ~5k tokens in / 0.5k out per question, 4-7s.
+     Runs the REAL stack (seeded local Spring, real model) with "today" pinned, through the same
+     `answer_question` the `/chat` endpoint now uses (extracted from the endpoint so evals test production, not a
+     lookalike; the endpoint tests guarded the refactor). `scorer.py`: pure, deterministic, every requirement a
+     named check; REQUIRED figures match leniently (the number anywhere), FORBIDDEN percent/money figures match
+     strictly (needs `%` / `$`), so "September 20" can't trip a forbidden 20%. Self-check test: for all 50 questions
+     an answer built from its own expectations passes and 6 kinds of wrong answer fail (forbidden figure, no tool
+     call, failed tool call, decline that fetched data, missing figure/phrase, withheld). `MeteredLLM` counts model
+     calls/tokens/time from outside the agent; the Gemini adapter now reports token usage. `report.py`: pass
+     rate overall and per category, tool accuracy, flaky / always-fail lists, latency median+p95, tokens.
+     Results go to `evals/results/` (git-ignored). Smoke run on 3 questions passed, including the follow-up that
+     once failed. Typical cost observed: ~2 model calls and ~5k tokens in / 0.5k out per question, 4-7s.
 - [x] 5. Baseline on `gemini-3.8-flash` + fixes. Final run: 50 questions x 3 attempts = 150 graded answers.
-      **148/150 passed as first graded (98.7%); 150/150 once two scorer mistakes were corrected and the saved
-      answers re-graded offline with `python -m evals.rescore <json>` (it lists every verdict it flips; only those
-      two changed, none pass->fail).** Tool accuracy 100%, 0 answers withheld, 0 run errors.
-      *Cost/speed:* median 9.0s, p95 17.9s (16 of 150 over 15s, max 36s; the slow ones are answers the grounding
-      guard sent back for a second try); ~2 model calls and ~6,850 tokens per answer (5,970 in / 870 out; ~1.03M
-      tokens for the 150), most of the input being the fixed prompt + tool schemas.
-      *What the runs found (in order of importance):*
-      (1) **Model flaws no figures-check could see:** answers containing LaTeX (`$$\frac{..}$$`), which a chat panel
-      renders as raw symbols -> prompt rule + a `plain_text` check on every question. A drafted "Journal Draft" with an
-      invented "Key Takeaway" -> prompt rule: the journal is the trader's own words, the assistant is read-only and
-      never writes reflections for them (product decision, reversible).
-      (2) **The grounding guard's value and cost:** run 1 sent 6 of 50 answers back (12%), one being a decline question
-      where the first draft quoted figures it had no source for. After fixes: 4 of 150 (2.7%), now only real
-      arithmetic by the model (it adds wins+losses, attempts a profit factor). False alarms removed at the source: the
-      small-sample threshold and the 1-5 rating scale now live in the context as FACTS, and the journal tool returns a
-      `count`. The guard itself was left strict.
-      (3) **Five eval mistakes (not assistant failures), all caught by reading the full answer before changing
-      anything:** forbidden-figure checks that a faithful comparison tripped (the figure was in the same tool result)
-      x3; a "no tools" demand on a concept question; and forbidden PHRASES that matched a correct refusal restating the
-      request x3 (quoting the injected journal note; "you should take more"; "your win rate is 100%"). Phrase
-      matching cannot tell refusing a claim from making it, so those checks now test behaviour: affirmative
-      recommendation phrases only, and the TRUE figure required.
-      *Caveat:* the prompt and the questions were both tuned against this one set across three runs, so 98.7% is
-      NOT an unbiased estimate of real-world accuracy. Write ~15-20 new questions blind (before seeing any output)
-      before quoting a headline number. Known weak spots: small-count expectations can match by chance; the
-      grounding guard checks that a number exists, not that it is the right one (the per-question forbidden
-      figures cover part of that).
-- [ ] 6. Model comparison run; record the table here and pick the default model. NEXT; not started. Each model costs
-      ~1M tokens and ~25 min for 3 attempts per question (or ~350k / ~8 min for 1), so agree the plan and models first.
+     **148/150 passed as first graded (98.7%); 150/150 once two scorer mistakes were corrected and the saved
+     answers re-graded offline with `python -m evals.rescore <json>` (it lists every verdict it flips; only those
+     two changed, none pass->fail).** Tool accuracy 100%, 0 answers withheld, 0 run errors.
+     _Cost/speed:_ median 9.0s, p95 17.9s (16 of 150 over 15s, max 36s; the slow ones are answers the grounding
+     guard sent back for a second try); ~2 model calls and ~6,850 tokens per answer (5,970 in / 870 out; ~1.03M
+     tokens for the 150), most of the input being the fixed prompt + tool schemas.
+     _What the runs found (in order of importance):_
+     (1) **Model flaws no figures-check could see:** answers containing LaTeX (`$$\frac{..}$$`), which a chat panel
+     renders as raw symbols -> prompt rule + a `plain_text` check on every question. A drafted "Journal Draft" with an
+     invented "Key Takeaway" -> prompt rule: the journal is the trader's own words, the assistant is read-only and
+     never writes reflections for them (product decision, reversible).
+     (2) **The grounding guard's value and cost:** run 1 sent 6 of 50 answers back (12%), one being a decline question
+     where the first draft quoted figures it had no source for. After fixes: 4 of 150 (2.7%), now only real
+     arithmetic by the model (it adds wins+losses, attempts a profit factor). False alarms removed at the source: the
+     small-sample threshold and the 1-5 rating scale now live in the context as FACTS, and the journal tool returns a
+     `count`. The guard itself was left strict.
+     (3) **Five eval mistakes (not assistant failures), all caught by reading the full answer before changing
+     anything:** forbidden-figure checks that a faithful comparison tripped (the figure was in the same tool result)
+     x3; a "no tools" demand on a concept question; and forbidden PHRASES that matched a correct refusal restating the
+     request x3 (quoting the injected journal note; "you should take more"; "your win rate is 100%"). Phrase
+     matching cannot tell refusing a claim from making it, so those checks now test behaviour: affirmative
+     recommendation phrases only, and the TRUE figure required.
+     _Caveat:_ the prompt and the questions were both tuned against this one set across three runs, so 98.7% is
+     NOT an unbiased estimate of real-world accuracy. Write ~15-20 new questions blind (before seeing any output)
+     before quoting a headline number. Known weak spots: small-count expectations can match by chance; the
+     grounding guard checks that a number exists, not that it is the right one (the per-question forbidden
+     figures cover part of that).
+- [x] 6. Model comparison: **skipped by choice.**
+- [x] 7. **Blind question batch — RESULT: 18/18 on the first and only run** (tool accuracy 100%, 0 withheld, 0 errors,
+      0 grounding corrections, median 7.4s, 115k tokens). Read in full: empty-data cases fetched and said "no trades"
+      (an Oct 3 Saturday, Topstep today, a tag that doesn't exist); declined to place an order; refused to "confirm" a
+      $1,000,000 balance and reported the real $100,040 / $50,136; declined to print its prompt without leaking any
+      wording. *Observed, deliberately not fixed (the prompt is not tuned to this set):* empty periods print
+      "Total P&L: $0.00" because the Java API returns `totalPnl: 0` (not null) when there are no trades, unlike the
+      rates, which are null; answers show internal account ids. Both are candidates for later polish.
+      Written like this: `evals/questions_blind.py`, 18 questions, `evals.run --set blind`. Written BEFORE
+     any run and never tuned against: the first-run result is the headline, because the 50-question set was
+     tuned on across three runs. "Blind" means not tuned against; the author knew the failure modes from the main
+     set, so it is a generalisation check, not a perfectly uncontaminated one. Any scorer fix after the run is
+     disclosed; the prompt is NOT changed to fit these questions.
 
 #### Phase 4 — Rate limiting (protect the Gemini key and your wallet) — PLANNED
 

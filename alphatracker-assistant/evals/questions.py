@@ -348,15 +348,17 @@ QUESTIONS: list[Question] = _build()
 
 
 # ----------------------------------------------------------------- validation
-def validate(questions: list[Question]) -> None:
-    """Fail loudly on a malformed question set, so a typo can't quietly become a false pass or fail."""
+def validate(questions: list[Question], categories: dict[str, int] | None = CATEGORIES) -> None:
+    """Fail loudly on a malformed question set, so a typo can't quietly become a false pass or fail.
+    `categories` is the planned mix to enforce (None skips that check, for sets with no fixed mix)."""
     ids = [q.id for q in questions]
     assert len(ids) == len(set(ids)), "duplicate question ids"
 
     by_category: dict[str, int] = {}
     for q in questions:
         by_category[q.category] = by_category.get(q.category, 0) + 1
-    assert by_category == CATEGORIES, f"category counts {by_category} != {CATEGORIES}"
+    if categories is not None:
+        assert by_category == categories, f"category counts {by_category} != {categories}"
 
     for q in questions:
         assert q.text.strip(), q.id
