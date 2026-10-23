@@ -418,8 +418,36 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
       rate overall and per category, tool accuracy, flaky / always-fail lists, latency median+p95, tokens.
       Results go to `evals/results/` (git-ignored). Smoke run on 3 questions passed, including the follow-up that
       once failed. Typical cost observed: ~2 model calls and ~5k tokens in / 0.5k out per question, 4-7s.
-- [ ] 5. Baseline run on the default model; fix real defects the evals expose (prompt / tools / grounding)
-- [ ] 6. Model comparison run; record the table here and pick the default model
+- [x] 5. Baseline on `gemini-3.8-flash` + fixes. Final run: 50 questions x 3 attempts = 150 graded answers.
+      **148/150 passed as first graded (98.7%); 150/150 once two scorer mistakes were corrected and the saved
+      answers re-graded offline with `python -m evals.rescore <json>` (it lists every verdict it flips; only those
+      two changed, none pass->fail).** Tool accuracy 100%, 0 answers withheld, 0 run errors.
+      *Cost/speed:* median 9.0s, p95 17.9s (16 of 150 over 15s, max 36s; the slow ones are answers the grounding
+      guard sent back for a second try); ~2 model calls and ~6,850 tokens per answer (5,970 in / 870 out; ~1.03M
+      tokens for the 150), most of the input being the fixed prompt + tool schemas.
+      *What the runs found (in order of importance):*
+      (1) **Model flaws no figures-check could see:** answers containing LaTeX (`$$\frac{..}$$`), which a chat panel
+      renders as raw symbols -> prompt rule + a `plain_text` check on every question. A drafted "Journal Draft" with an
+      invented "Key Takeaway" -> prompt rule: the journal is the trader's own words, the assistant is read-only and
+      never writes reflections for them (product decision, reversible).
+      (2) **The grounding guard's value and cost:** run 1 sent 6 of 50 answers back (12%), one being a decline question
+      where the first draft quoted figures it had no source for. After fixes: 4 of 150 (2.7%), now only real
+      arithmetic by the model (it adds wins+losses, attempts a profit factor). False alarms removed at the source: the
+      small-sample threshold and the 1-5 rating scale now live in the context as FACTS, and the journal tool returns a
+      `count`. The guard itself was left strict.
+      (3) **Five eval mistakes (not assistant failures), all caught by reading the full answer before changing
+      anything:** forbidden-figure checks that a faithful comparison tripped (the figure was in the same tool result)
+      x3; a "no tools" demand on a concept question; and forbidden PHRASES that matched a correct refusal restating the
+      request x3 (quoting the injected journal note; "you should take more"; "your win rate is 100%"). Phrase
+      matching cannot tell refusing a claim from making it, so those checks now test behaviour: affirmative
+      recommendation phrases only, and the TRUE figure required.
+      *Caveat:* the prompt and the questions were both tuned against this one set across three runs, so 98.7% is
+      NOT an unbiased estimate of real-world accuracy. Write ~15-20 new questions blind (before seeing any output)
+      before quoting a headline number. Known weak spots: small-count expectations can match by chance; the
+      grounding guard checks that a number exists, not that it is the right one (the per-question forbidden
+      figures cover part of that).
+- [ ] 6. Model comparison run; record the table here and pick the default model. NEXT; not started. Each model costs
+      ~1M tokens and ~25 min for 3 attempts per question (or ~350k / ~8 min for 1), so agree the plan and models first.
 
 #### Phase 4 — Rate limiting (protect the Gemini key and your wallet) — PLANNED
 
