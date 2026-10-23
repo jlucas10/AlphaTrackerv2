@@ -122,6 +122,12 @@ def test_chat_is_limited_per_user_after_authentication_and_before_any_model_call
     assert int(blocked.headers["Retry-After"]) >= 1
     assert "too quickly" in blocked.json()["detail"]
 
+    # From a browser (a request carrying an Origin), the wait time must be READABLE by the page's JavaScript.
+    cross_origin = client.post("/chat", json={"message": "hi"},
+                               headers={"Authorization": f"Bearer {second_login}", "Origin": "http://localhost:5173"})
+    assert cross_origin.status_code == 429
+    assert "retry-after" in cross_origin.headers["access-control-expose-headers"].lower()
+
     assert ask(fake_jwt("someone.else@x.com")).status_code == 200      # a different user has their own allowance
     assert len(llm.calls) == 3                            # exactly the 3 admitted requests reached the model
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { AssistantProvider } from './context/AssistantContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthView from './pages/AuthView';
 import DashboardView from './pages/DashboardView';
@@ -25,6 +26,8 @@ const App: React.FC = () => {
   return (
     // Provide global authentication state to all routes
     <AuthProvider>
+      {/* Above the routes so the assistant conversation survives moving between pages. */}
+      <AssistantProvider>
       <Router>
         <Routes>
           {/* Public Route: Anyone can see this screen */}
@@ -53,6 +56,7 @@ const App: React.FC = () => {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Router>
+      </AssistantProvider>
     </AuthProvider>
   );
 };

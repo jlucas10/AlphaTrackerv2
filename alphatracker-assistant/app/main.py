@@ -29,6 +29,10 @@ def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM
         allow_origin_regex=r"http://localhost:\d+",
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
+        # Browsers hide every response header except a short safe list from page JavaScript unless
+        # the server names it here. Without this the chat panel can see a 429 but never read how long
+        # to wait; curl and the Python tests can't show the problem, only a real browser can.
+        expose_headers=["Retry-After"],
     )
 
     # The model client is built on first use, not at startup: /health and the

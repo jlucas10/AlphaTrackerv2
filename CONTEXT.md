@@ -448,19 +448,19 @@ repeatable, and let models/prompts be compared with numbers instead of impressio
      figures cover part of that).
 - [x] 6. Model comparison: **skipped by choice.**
 - [x] 7. **Blind question batch — RESULT: 18/18 on the first and only run** (tool accuracy 100%, 0 withheld, 0 errors,
-      0 grounding corrections, median 7.4s, 115k tokens). Read in full: empty-data cases fetched and said "no trades"
-      (an Oct 3 Saturday, Topstep today, a tag that doesn't exist); declined to place an order; refused to "confirm" a
-      $1,000,000 balance and reported the real $100,040 / $50,136; declined to print its prompt without leaking any
-      wording. *Observed, deliberately not fixed (the prompt is not tuned to this set):* empty periods print
-      "Total P&L: $0.00" because the Java API returns `totalPnl: 0` (not null) when there are no trades, unlike the
-      rates, which are null; answers show internal account ids. Both are candidates for later polish.
-      Written like this: `evals/questions_blind.py`, 18 questions, `evals.run --set blind`. Written BEFORE
+     0 grounding corrections, median 7.4s, 115k tokens). Read in full: empty-data cases fetched and said "no trades"
+     (an Oct 3 Saturday, Topstep today, a tag that doesn't exist); declined to place an order; refused to "confirm" a
+     $1,000,000 balance and reported the real $100,040 / $50,136; declined to print its prompt without leaking any
+     wording. _Observed, deliberately not fixed (the prompt is not tuned to this set):_ empty periods print
+     "Total P&L: $0.00" because the Java API returns `totalPnl: 0` (not null) when there are no trades, unlike the
+     rates, which are null; answers show internal account ids. Both are candidates for later polish.
+     Written like this: `evals/questions_blind.py`, 18 questions, `evals.run --set blind`. Written BEFORE
      any run and never tuned against: the first-run result is the headline, because the 50-question set was
      tuned on across three runs. "Blind" means not tuned against; the author knew the failure modes from the main
      set, so it is a generalisation check, not a perfectly uncontaminated one. Any scorer fix after the run is
      disclosed; the prompt is NOT changed to fit these questions.
 
-#### Phase 4 — Rate limiting (protect the Gemini key and your wallet) — PLANNED
+#### Phase 4 — Rate limiting (protect the Gemini key and your wallet) — DONE
 
 **Why:** each chat costs 1–3 Gemini calls, and any valid JWT can call `/chat`. Before the service is reachable
 from a browser, one runaway client or loop must not be able to burn the budget.
@@ -483,14 +483,14 @@ from a browser, one runaway client or loop must not be able to burn the budget.
   already proved Spring verified it; a re-login does not reset the allowance. Env: `RATE_LIMIT_PER_MINUTE` (10),
   `RATE_LIMIT_PER_DAY` (100), `RATE_LIMIT_GLOBAL_PER_DAY` (1000). A 429 carries `Retry-After` and a message that
   says which limit was hit (minute / daily / global capacity).
-  *Checked live* (limit 2/min, deliberately invalid model key so admitted requests cost nothing): 3 junk tokens
+  _Checked live_ (limit 2/min, deliberately invalid model key so admitted requests cost nothing): 3 junk tokens
   -> 401 and no allowance used; requests 1-2 reached the model; request 3 -> 429 `Retry-After: 60`; a fresh login
   was still limited.
-  *Finding:* the first concurrency test (200 requests, default thread switching) would almost never have caught a
+  _Finding:_ the first concurrency test (200 requests, default thread switching) would almost never have caught a
   missing lock; with the lock removed, 1 run in 5 admitted 51 instead of 50. The test now forces frequent thread
   switches over 20 rounds of 2000 requests (~4.5s) and also asserts the unlocked version over-admits, so it can
   actually fail. The unlocked case is probabilistic; the lock is the real guarantee.
-  *Limits:* in memory, single process: counts reset on restart and are not shared across replicas (Redis is the
+  _Limits:_ in memory, single process: counts reset on restart and are not shared across replicas (Redis is the
   upgrade). Sprint 5 can make the limits per subscription tier.
 
 #### Phase 5 — React chat panel + deployment — PLANNED
@@ -514,8 +514,12 @@ from a browser, one runaway client or loop must not be able to burn the budget.
   `GEMINI_API_KEY`, `SPRING_API_BASE_URL`, `CORS_ALLOWED_ORIGINS`=the Vercel origin); Vercel gets
   `VITE_ASSISTANT_API_URL`. Build the Dockerfile locally first (never run yet).
 - **Needs first:** Phase 4 (rate limiting) and the `TIMEZONE` decision.
-- Steps: [ ] 1. api + hook [ ] 2. panel UI + Markdown [ ] 3. error/loading states [ ] 4. sidebar entry +
-  starter chips [ ] 5. build Docker image, deploy service, set CORS + env vars [ ] 6. live click-through.
+- **Steps:**
+  - [x] 1. **API + state (no UI yet).**
+  - [ ] 2. panel UI + Markdown (adds `react-markdown`)
+  - [ ] 3. error/loading states
+  - [ ] 4. sidebar entry + starter chips
+  - [ ] 5. build Docker image, deploy service, set CORS + env vars - [ ] 6. live click-through.
 
 #### Phase 6 — pgvector search over journal notes — LATER (not scheduled)
 
