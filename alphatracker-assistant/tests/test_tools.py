@@ -73,6 +73,7 @@ def test_spring_refusals_go_back_to_the_model_but_a_dead_token_ends_the_request(
     entries = [{"date": f"2026-01-{d:02d}", "notes": "x" * 2000, "htfBias": "Bullish"} for d in range(1, 29)]
     big = runner(FakeSpring(response=entries)).run("get_journal_entries", {"period": "last_30_days"}, "tok")
     assert big.ok and big.payload["truncated"] is True
+    assert big.payload["count"] == 28          # the model is given the count, so it never has to count entries itself
     assert big.payload["returned"] < big.payload["total"] == 28
     assert len(str(big.payload["data"])) <= MAX_PAYLOAD_CHARS + 500
 

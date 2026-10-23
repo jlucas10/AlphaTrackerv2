@@ -62,6 +62,11 @@ def test_a_forbidden_percentage_is_not_tripped_by_a_date_but_is_caught_when_it_i
     assert score(sample, f"{answer} Reference number 112.", calls).passed
     assert not score(sample, f"{answer} versus $112.00 across all accounts", calls).passed
 
+    # LaTeX in ANY answer fails it, however right the figures are (the chat panel can't render it).
+    for markup in (r"$$\text{winRate} = \frac{wins}{wins + losses}$$", r"\times 100"):
+        assert not score(q, f"{perfect(q)[0]} {markup}", perfect(q)[1]).passed
+    assert score(q, f"{perfect(q)[0]} Costs $5 to $10 per contract.", perfect(q)[1]).passed   # ordinary dollars are fine
+
     # Curly apostrophes must not defeat a decline: "can’t" should match "can't".
     decline = BY_ID["scope-01"]
     assert score(decline, "I can’t analyse that sequence.", []).passed
