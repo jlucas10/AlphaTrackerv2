@@ -229,7 +229,10 @@ def _fit_journal(entries: list[dict[str, Any]]) -> dict[str, Any]:
         if size > MAX_PAYLOAD_CHARS:
             break
         kept.append(entry)
-    payload: dict[str, Any] = {"data": kept}
+    # `count` is the TOTAL number of entries in the range. Without it the model counts the list
+    # itself ("you wrote 3 entries"), which the grounding check rightly refuses as unsupported;
+    # handing it the figure is cheaper and more honest than letting it count.
+    payload: dict[str, Any] = {"data": kept, "count": len(entries)}
     if len(kept) < len(entries):
         payload.update(
             truncated=True,

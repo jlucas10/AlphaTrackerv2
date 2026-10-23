@@ -93,7 +93,10 @@ class Agent:
                     return AgentResult(text, trace)
                 if corrections < MAX_CORRECTIONS:
                     corrections += 1
-                    logger.warning("answer had figures no tool returned; asking the model to fix it")
+                    # The figures are the MODEL's unsupported claims (not user data or secrets), and seeing
+                    # them is what tells you whether it is inventing numbers or just adding things up.
+                    logger.warning("answer had figures no tool returned (%s); asking the model to fix it",
+                                   ", ".join(f"{n:g}" for n in unknown))
                     messages.append(Message("assistant", text=turn.text, raw=turn.raw))
                     messages.append(Message("user", text=_correction(unknown)))
                     continue
