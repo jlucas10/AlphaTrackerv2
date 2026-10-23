@@ -23,6 +23,10 @@ Create `alphatracker-assistant/.env` (it is git-ignored, never commit it) with a
 GEMINI_API_KEY=your-key-here
 ```
 
+Chat limits (per user, then one global cap; see `app/ratelimit.py`): `RATE_LIMIT_PER_MINUTE` (default 10),
+`RATE_LIMIT_PER_DAY` (100), `RATE_LIMIT_GLOBAL_PER_DAY` (1000). Counts are held in memory, so they reset when the
+service restarts.
+
 Optional variables: `GEMINI_MODEL`, `SPRING_API_BASE_URL` (default
 `http://localhost:8080/api/v1`), `TIMEZONE` (default `America/Los_Angeles`, defines what
 "today" means), `CORS_ALLOWED_ORIGINS` (comma-separated extra origins; any

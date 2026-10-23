@@ -1,7 +1,7 @@
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # Defines what "today" / "this month" mean when a period is resolved.
     # Trade dates are stored without a timezone, so one has to be chosen.
     timezone: str = "America/Los_Angeles"
+
+    # Chat limits (see app/ratelimit.py). Every admitted request can cost 1-3 model calls.
+    # per-minute stops loops; per-day is each user's budget; global-per-day bounds total spend.
+    rate_limit_per_minute: int = Field(default=10, ge=1)
+    rate_limit_per_day: int = Field(default=100, ge=1)
+    rate_limit_global_per_day: int = Field(default=1000, ge=1)
 
     # Comma-separated extra origins (e.g. the Vercel URL in production).
     # Any http://localhost:<port> is always allowed for local development.

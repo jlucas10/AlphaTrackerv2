@@ -476,8 +476,22 @@ from a browser, one runaway client or loop must not be able to burn the budget.
 - **In-memory, single instance:** correct for one Railway container; resets on restart and does not span
   replicas. Moving to Redis is the known upgrade if the service is ever scaled out. Stated, not hidden.
 - **Sprint 5 hook:** limits become per-tier (Free vs Pro) by reading the subscription from Spring later.
-- Steps: [ ] 1. limiter (sliding window, injectable clock) + tests [ ] 2. wire into `/chat` before the model
-  call [ ] 3. env settings + README [ ] 4. live check that the 11th request in a minute gets a 429.
+- **STATUS: DONE** (3 tests; the assistant suite is at 43). `app/ratelimit.py` (sliding-window log, injectable clock,
+  one lock around check-and-record, rejections not counted, idle users purged), wired through `answer_question`'s
+  `before_model` hook so it runs after the preflight and before any model spend (the evals pass no hook, so they are
+  never throttled). `user_key()` decodes the JWT `sub` WITHOUT verifying it, which is only safe because the preflight
+  already proved Spring verified it; a re-login does not reset the allowance. Env: `RATE_LIMIT_PER_MINUTE` (10),
+  `RATE_LIMIT_PER_DAY` (100), `RATE_LIMIT_GLOBAL_PER_DAY` (1000). A 429 carries `Retry-After` and a message that
+  says which limit was hit (minute / daily / global capacity).
+  *Checked live* (limit 2/min, deliberately invalid model key so admitted requests cost nothing): 3 junk tokens
+  -> 401 and no allowance used; requests 1-2 reached the model; request 3 -> 429 `Retry-After: 60`; a fresh login
+  was still limited.
+  *Finding:* the first concurrency test (200 requests, default thread switching) would almost never have caught a
+  missing lock; with the lock removed, 1 run in 5 admitted 51 instead of 50. The test now forces frequent thread
+  switches over 20 rounds of 2000 requests (~4.5s) and also asserts the unlocked version over-admits, so it can
+  actually fail. The unlocked case is probabilistic; the lock is the real guarantee.
+  *Limits:* in memory, single process: counts reset on restart and are not shared across replicas (Redis is the
+  upgrade). Sprint 5 can make the limits per subscription tier.
 
 #### Phase 5 — React chat panel + deployment — PLANNED
 

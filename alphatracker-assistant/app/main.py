@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.chat import build_chat_router
 from app.config import Settings, get_settings
 from app.llm import LLM, build_llm
+from app.ratelimit import RateLimiter
 from app.spring_client import SpringClient
 
 
-def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM | None = None,
+               limiter: RateLimiter | None = None) -> FastAPI:
     # A factory (rather than a module-level app built from global settings) so
     # tests can build an app with exactly the configuration - and fake Spring /
     # fake model - they want.
@@ -40,7 +42,10 @@ def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM
             cache["llm"] = build_llm(settings)
         return cache["llm"]
 
-    app.include_router(build_chat_router(settings, spring, get_llm))
+    # One limiter for the whole process: its counts must be shared by every request thread.
+    limiter = limiter or RateLimiter(settings.rate_limit_per_minute, settings.rate_limit_per_day,
+                                     settings.rate_limit_global_per_day)
+    app.include_router(build_chat_router(settings, spring, get_llm, limiter))
 
     @app.get("/health")
     def health() -> dict[str, object]:

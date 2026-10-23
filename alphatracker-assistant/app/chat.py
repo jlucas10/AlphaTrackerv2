@@ -10,6 +10,7 @@ from app.config import Settings
 from app.llm import LLM, AssistantNotConfigured, LLMError, Message
 from app.periods import today_in
 from app.prompts import build_context, build_system_prompt
+from app.ratelimit import RateLimiter, RateLimitExceeded, user_key
 from app.spring_client import SpringAuthError, SpringUnavailable
 from app.tools import ToolRunner
 
@@ -46,7 +47,25 @@ class ChatResponse(BaseModel):
     tool_calls: list[ToolCallOut]
 
 
-def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM]) -> APIRouter:
+def _wait(seconds: int) -> str:
+    if seconds < 90:
+        return f"{seconds} seconds"
+    if seconds < 7200:
+        return f"about {round(seconds / 60)} minutes"
+    return f"about {round(seconds / 3600)} hours"
+
+
+def _limit_message(exc: RateLimitExceeded) -> str:
+    """What the trader reads. Each limit means something different, so each says so."""
+    if exc.scope == "minute":
+        return f"You're sending messages too quickly. Please wait {_wait(exc.retry_after)}."
+    if exc.scope == "day":
+        return f"You've reached today's message limit. You can ask again in {_wait(exc.retry_after)}."
+    return "The assistant has reached its daily capacity. Please try again later."
+
+
+def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM],
+                      limiter: RateLimiter) -> APIRouter:
     router = APIRouter()
     runner = ToolRunner(spring, today=lambda: today_in(settings.timezone))
 
@@ -62,7 +81,11 @@ def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM
                 message=request.message,
                 history=to_messages((t.role, t.content) for t in request.history),
                 today=today_in(settings.timezone),
+                before_model=lambda: limiter.admit(user_key(token)),
             )
+        except RateLimitExceeded as exc:
+            logger.info("rate limited (%s limit)", exc.scope)  # the scope only; never the user or the token
+            raise HTTPException(429, _limit_message(exc), headers={"Retry-After": str(exc.retry_after)}) from None
         except AssistantNotConfigured:
             raise HTTPException(503, "The assistant isn't configured on the server.") from None
         except SpringAuthError:
@@ -99,6 +122,7 @@ def answer_question(
     message: str,
     history: list[Message],
     today: date,
+    before_model: Callable[[], None] | None = None,
 ) -> AgentResult:
     """The whole path from a question to a checked answer.
 
@@ -110,6 +134,11 @@ def answer_question(
     # token costs one cheap GET, not a Gemini request), and the result preloads the
     # trader's accounts into the prompt so "my Apex account" resolves.
     accounts = spring.get("/accounts", token)
+    if before_model:
+        # Runs after the token is proven valid and before anything is spent. The endpoint uses it for
+        # rate limiting (the user's identity is only trustworthy once the preflight has passed); the
+        # evals pass nothing, so they are never throttled.
+        before_model()
     llm = get_llm()
     context = build_context(today, settings.timezone, accounts if isinstance(accounts, list) else None)
     return Agent(llm, runner).run(
