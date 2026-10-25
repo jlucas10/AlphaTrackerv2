@@ -47,20 +47,16 @@ class ChatResponse(BaseModel):
     tool_calls: list[ToolCallOut]
 
 
-def _wait(seconds: int) -> str:
-    if seconds < 90:
-        return f"{seconds} seconds"
-    if seconds < 7200:
-        return f"about {round(seconds / 60)} minutes"
-    return f"about {round(seconds / 3600)} hours"
-
-
 def _limit_message(exc: RateLimitExceeded) -> str:
-    """What the trader reads. Each limit means something different, so each says so."""
+    """What happened, in words for the trader. Each limit means something different, so each says so.
+
+    Deliberately says nothing about HOW LONG: the wait is in the Retry-After header, which a client can
+    count down live. A number baked into the sentence would sit beside a ticking countdown, frozen and wrong.
+    """
     if exc.scope == "minute":
-        return f"You're sending messages too quickly. Please wait {_wait(exc.retry_after)}."
+        return "You're sending messages too quickly. Please slow down."
     if exc.scope == "day":
-        return f"You've reached today's message limit. You can ask again in {_wait(exc.retry_after)}."
+        return "You've reached today's message limit."
     return "The assistant has reached its daily capacity. Please try again later."
 
 

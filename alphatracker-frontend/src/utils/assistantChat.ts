@@ -35,13 +35,30 @@ export function buildHistory(messages: ChatMessage[]): HistoryTurn[] {
 export class AssistantError extends Error {
   readonly kind: AssistantErrorKind;
   readonly retryAfterSeconds?: number;
+  readonly createdAt: number;  // when the error arrived (ms since epoch)
+  readonly retryAt?: number;   // the moment sending is allowed again (ms since epoch), for rate limits
 
-  constructor(kind: AssistantErrorKind, message: string, retryAfterSeconds?: number) {
+  // `now` is a parameter so the clock can be controlled when checking this; callers normally omit it.
+  constructor(kind: AssistantErrorKind, message: string, retryAfterSeconds?: number, now: number = Date.now()) {
     super(message);
     this.name = 'AssistantError';
     this.kind = kind;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.createdAt = now;
+    // A fixed deadline, worked out ONCE here. A countdown that subtracts a second per tick drifts, and
+    // browsers slow timers in background tabs; comparing against a deadline is right however late a tick is.
+    this.retryAt = retryAfterSeconds === undefined ? undefined : now + retryAfterSeconds * 1000;
   }
+}
+
+// "45 seconds", "about 12 minutes", "about 20 hours": a daily limit can mean hours, and "72000s" is no use.
+export function formatWait(seconds: number): string {
+  if (seconds < 90) {
+    const whole = Math.max(1, Math.ceil(seconds));
+    return `${whole} ${whole === 1 ? 'second' : 'seconds'}`;
+  }
+  if (seconds < 7200) return `about ${Math.round(seconds / 60)} minutes`;
+  return `about ${Math.round(seconds / 3600)} hours`;
 }
 
 // The few fields we read from an Axios error. Declared structurally, instead of importing
@@ -62,7 +79,7 @@ function detailOf(data: unknown): string | undefined {
   return typeof detail === 'string' && detail.trim() ? detail : undefined; // a 422 detail is a list; not for display
 }
 
-export function toAssistantError(err: unknown): AssistantError {
+export function toAssistantError(err: unknown, now: number = Date.now()): AssistantError {
   const { code, response } = (err ?? {}) as ErrorLike;
 
   if (!response) {
@@ -81,6 +98,7 @@ export function toAssistantError(err: unknown): AssistantError {
         'rate_limited',
         detailOf(response.data) ?? 'Too many messages. Please wait a moment.',
         Number.isFinite(wait) && wait > 0 ? wait : undefined,
+        now,
       );
     }
     case 422:
