@@ -20,6 +20,9 @@ from app.agent import ToolCallRecord
 from app.grounding import numbers_in
 from evals.questions import Expect, Question
 
+# LaTeX / math markup. The chat panel renders Markdown, not LaTeX, so "$$\frac{wins}{...}$$"
+# shows up as raw symbols. A baseline run caught this in an answer the figures-only checks passed.
+_MATH_MARKUP = re.compile(r"\$\$|\\(?:text|frac|times|cdot|left|right|sum)\b")
 _PERCENT = re.compile(r"(\d[\d,]*(?:\.\d+)?)\s*(?:%|percent\b)", re.IGNORECASE)
 _MONEY = re.compile(r"\$\s*(\d[\d,]*(?:\.\d+)?)")
 
@@ -83,6 +86,9 @@ def score(question: Question, answer: str, tool_calls: list[ToolCallRecord], wit
 
     checks.append(Check("answered", bool(answer.strip()) and not withheld,
                         "the grounding check withheld the answer (unsupported figures)" if withheld else ""))
+
+    # Applies to EVERY question: the answer must render in a plain Markdown chat.
+    checks.append(Check("plain_text", not _MATH_MARKUP.search(answer), "answer contains LaTeX/math markup"))
 
     # Only calls that returned data count toward a required tool; a rejected call did not answer anything.
     succeeded = {c.name for c in tool_calls if c.status == "ok"}

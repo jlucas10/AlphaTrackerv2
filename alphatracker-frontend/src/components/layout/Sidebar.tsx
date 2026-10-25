@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useAssistant } from '../../hooks/useAssistant';
 
 interface SidebarProps {
   active: 'dashboard' | 'journal';
@@ -17,6 +18,7 @@ interface SidebarProps {
 // /accounts page; this nav entry can come back once that's built.
 export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
   const { logout } = useAuth();
+  const { isOpen, toggle } = useAssistant();
   const navigate = useNavigate();
 
   const linkClass = (isActive: boolean) =>
@@ -45,6 +47,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
           </button>
           <button onClick={() => navigate('/journal')} className={linkClass(active === 'journal')}>
             <span>📓</span> Trading Journal
+          </button>
+          {/* Not a page: it opens the assistant drawer (mounted once in App.tsx), so it highlights while open. */}
+          <button onClick={toggle} className={linkClass(isOpen)}>
+            <span>✨</span> Ask the assistant
           </button>
         </nav>
       </div>

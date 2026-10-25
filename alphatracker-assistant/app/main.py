@@ -6,10 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.chat import build_chat_router
 from app.config import Settings, get_settings
 from app.llm import LLM, build_llm
+from app.ratelimit import RateLimiter
 from app.spring_client import SpringClient
 
 
-def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM | None = None,
+               limiter: RateLimiter | None = None) -> FastAPI:
     # A factory (rather than a module-level app built from global settings) so
     # tests can build an app with exactly the configuration - and fake Spring /
     # fake model - they want.
@@ -27,6 +29,10 @@ def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM
         allow_origin_regex=r"http://localhost:\d+",
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
+        # Browsers hide every response header except a short safe list from page JavaScript unless
+        # the server names it here. Without this the chat panel can see a 429 but never read how long
+        # to wait; curl and the Python tests can't show the problem, only a real browser can.
+        expose_headers=["Retry-After"],
     )
 
     # The model client is built on first use, not at startup: /health and the
@@ -40,7 +46,10 @@ def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM
             cache["llm"] = build_llm(settings)
         return cache["llm"]
 
-    app.include_router(build_chat_router(settings, spring, get_llm))
+    # One limiter for the whole process: its counts must be shared by every request thread.
+    limiter = limiter or RateLimiter(settings.rate_limit_per_minute, settings.rate_limit_per_day,
+                                     settings.rate_limit_global_per_day)
+    app.include_router(build_chat_router(settings, spring, get_llm, limiter))
 
     @app.get("/health")
     def health() -> dict[str, object]:

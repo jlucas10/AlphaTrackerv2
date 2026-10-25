@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 
 // VITE_API_BASE_URL is baked in at build time (Vite only exposes env vars
 // prefixed with VITE_ to client code - see vite.config.ts). Vercel sets this
@@ -11,19 +11,22 @@ const apiClient = axios.create({
   },
 });
 
-// Configure global request interceptor 
+// Look in local storage for the JWT we saved during login/registration and, if there is one,
+// inject it into the Authorization header. Exported so the assistant client (api/assistant.ts)
+// attaches the token the same way, from one place, instead of repeating the storage key.
+export function attachToken(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+    const token = localStorage.getItem('token');
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+}
+
+// Configure global request interceptor
 apiClient.interceptors.request.use(
-    (config) => {
-        // look in local storage for JWT token we saved during login/registration
-        const token = localStorage.getItem('token');
-
-        // if token exists, inject directly into authorization header
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return config;
-    },
+    attachToken,
     (error) => {
         // Handle any client side transmission error
         return Promise.reject(error)
