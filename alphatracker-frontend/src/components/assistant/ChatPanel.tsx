@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAssistant } from '../../hooks/useAssistant';
-import { MAX_MESSAGE_CHARS, STARTER_QUESTIONS } from '../../utils/assistantChat';
+import { useRetryCountdown } from '../../hooks/useRetryCountdown';
+import { MAX_MESSAGE_CHARS, STARTER_QUESTIONS, formatWait } from '../../utils/assistantChat';
 import { MessageBubble } from './MessageBubble';
 
 // A slide-over drawer, mounted once at the top of the app (App.tsx) and always in the page: closing it
@@ -10,6 +11,7 @@ import { MessageBubble } from './MessageBubble';
 export const ChatPanel: React.FC = () => {
   const { isAuthenticated, logout } = useAuth();
   const { isOpen, close, messages, sending, error, send, retry, clear } = useAssistant();
+  const waiting = useRetryCountdown(error); // seconds left on a rate limit; 0 when free to send
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -27,7 +29,7 @@ export const ChatPanel: React.FC = () => {
 
   const submit = () => {
     const text = draft.trim();
-    if (!text || sending) return;
+    if (!text || sending || waiting > 0) return; // while rate-limited, Enter does nothing (the button is disabled too)
     setDraft('');
     void send(text);
   };
@@ -123,6 +125,12 @@ export const ChatPanel: React.FC = () => {
         {error && (
           <div role="alert" className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
             <p>{error.message}</p>
+            {/* A rate limit says when sending opens up again, counting down live. */}
+            {error.retryAt !== undefined && (
+              <p className="mt-1 text-xs font-semibold text-red-500">
+                {waiting > 0 ? `You can send again in ${formatWait(waiting)}.` : 'You can send again now.'}
+              </p>
+            )}
             <div className="mt-2 flex gap-4 text-xs font-bold">
               {error.kind === 'auth' && (
                 <button type="button" onClick={logout} className="underline">
@@ -130,7 +138,12 @@ export const ChatPanel: React.FC = () => {
                 </button>
               )}
               {error.kind !== 'auth' && canRetry && (
-                <button type="button" onClick={() => void retry()} disabled={sending} className="underline disabled:opacity-40">
+                <button
+                  type="button"
+                  onClick={() => void retry()}
+                  disabled={sending || waiting > 0}
+                  className="underline disabled:opacity-40"
+                >
                   Try again
                 </button>
               )}
@@ -156,7 +169,7 @@ export const ChatPanel: React.FC = () => {
           <button
             type="button"
             onClick={submit}
-            disabled={!draft.trim() || sending || overLimit}
+            disabled={!draft.trim() || sending || overLimit || waiting > 0}
             className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Send
