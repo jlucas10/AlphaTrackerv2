@@ -2,7 +2,7 @@
 // who a token belongs to. No React and no network in here, on purpose, so it can be checked
 // on its own and the hook stays thin.
 
-import type { AssistantErrorKind, ChatMessage, HistoryTurn } from '../types/Assistant';
+import type { AssistantErrorKind, ChatMessage, HistoryTurn, ToolCall } from '../types/Assistant';
 
 // These MIRROR alphatracker-assistant/app/chat.py (MAX_MESSAGE_CHARS, MAX_HISTORY_TURNS,
 // MAX_HISTORY_ITEM_CHARS). If the server tightens one and this is not updated, requests start
@@ -104,4 +104,59 @@ export function subjectOf(token: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+// ------------------------------------------------------------------ presentation
+// What the empty chat offers. Each is a question the assistant answers well, so a first-time user
+// gets a good first answer instead of a blank box.
+export const STARTER_QUESTIONS = [
+  "What's my win rate this month?",
+  'Do I do better when I follow my plan?',
+  'Which setup has made me the most money?',
+  'What did I write in my journal last week?',
+];
+
+const TOOL_LABELS: Record<string, string> = {
+  get_summary: 'Performance summary',
+  get_breakdown: 'Breakdown',
+  get_discipline: 'Plan-following stats',
+  get_journal_entries: 'Journal notes',
+  list_accounts: 'Your accounts',
+};
+
+const PERIOD_LABELS: Record<string, string> = {
+  today: 'today',
+  this_week: 'this week',
+  last_week: 'last week',
+  this_month: 'this month',
+  last_month: 'last month',
+  last_30_days: 'last 30 days',
+  all_time: 'all time',
+};
+
+// Tools that look at trades over a window; with no period or dates given they cover all time.
+const WINDOWED_TOOLS = new Set(['get_summary', 'get_breakdown', 'get_discipline']);
+
+// "Breakdown (by instrument, this month)": what the assistant looked at to answer, in the trader's
+// words rather than tool names and ids. Shown under each answer so a number can be traced to its source.
+export function describeToolCall(call: ToolCall): string {
+  const parts: string[] = [];
+  if (call.name === 'get_breakdown' && typeof call.args.by === 'string') parts.push(`by ${call.args.by}`);
+
+  const { period, from_date: from, to_date: to } = call.args;
+  if (typeof period === 'string') parts.push(PERIOD_LABELS[period] ?? period);
+  else if (from || to) parts.push(`${from ?? '…'} to ${to ?? '…'}`);
+  else if (WINDOWED_TOOLS.has(call.name)) parts.push('all time');
+
+  const label = TOOL_LABELS[call.name] ?? call.name.replace(/_/g, ' ');
+  return parts.length ? `${label} (${parts.join(', ')})` : label;
+}
+
+// The distinct things looked at. A call the assistant repeated is not listed twice, and one that
+// failed says so, because an answer built partly on a failed lookup should not look fully sourced.
+export function describeSources(calls: ToolCall[] | undefined): string[] {
+  const lines = (calls ?? [])
+    .filter((c) => c.status !== 'repeat')
+    .map((c) => (c.status === 'ok' ? describeToolCall(c) : `${describeToolCall(c)}: couldn't load`));
+  return [...new Set(lines)];
 }

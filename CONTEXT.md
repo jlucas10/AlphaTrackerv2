@@ -516,10 +516,11 @@ from a browser, one runaway client or loop must not be able to burn the budget.
 - **Needs first:** Phase 4 (rate limiting) and the `TIMEZONE` decision.
 - **Steps:**
   - [x] 1. **API + state (no UI yet).**
-  - [ ] 2. panel UI + Markdown (adds `react-markdown`)
-  - [ ] 3. error/loading states
-  - [ ] 4. sidebar entry + starter chips
-  - [ ] 5. build Docker image, deploy service, set CORS + env vars - [ ] 6. live click-through.
+  - [x] 2. **Panel UI + Markdown.**
+  - [~] 3. **Error/loading states: mostly done**
+  - [x] 4. **Sidebar entry + starter chips.**
+  - [ ] 5. build Docker image, deploy service, set CORS + env vars
+  - [ ] 6. live click-through (real browser, real login).
 
 #### Phase 6 — pgvector search over journal notes — LATER (not scheduled)
 
