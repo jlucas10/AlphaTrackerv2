@@ -6,7 +6,7 @@ fee is modeled: prop firms don't pass per-trade commissions through the way a re
 
 ## Core Tech Stack
 
-- **Backend:** Java 17, Spring Boot, Spring Security, JWT Auth, PostgreSQL (Hibernate/JPA)
+- **Backend:** Java 21, Spring Boot, Spring Security, JWT Auth, PostgreSQL (Hibernate/JPA)
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Axios, Recharts, date-fns
 
 ## Data Flow & Architecture
@@ -493,7 +493,7 @@ from a browser, one runaway client or loop must not be able to burn the budget.
   _Limits:_ in memory, single process: counts reset on restart and are not shared across replicas (Redis is the
   upgrade). Sprint 5 can make the limits per subscription tier.
 
-#### Phase 5 — React chat panel + deployment — PLANNED
+#### Phase 5 — React chat panel + deployment — Done
 
 **Goal:** use the assistant from the app. A slide-over panel on the dashboard/journal, opened from the sidebar.
 
@@ -523,21 +523,7 @@ from a browser, one runaway client or loop must not be able to burn the budget.
        "subtract 1 per tick", which drifts and is throttled in background tabs). The service's 429 message now says
        WHAT happened and the header says WHEN, so the UI never shows a frozen number beside a live one.
   - [x] 4. **Sidebar entry + starter chips.**
-  - [x] 5. **Docker image + deploy.** Built the image for the first time and fixed two real problems before deploying:
-    it ran as root (now a non-root `appuser`) and its dependencies were unpinned (Railway would have installed
-    FastAPI 0.162 / Starlette 1.10 / google-genai 2.33 instead of the tested 0.142 / 1.7 / 2.30.1), so the image
-    now installs the exact tested versions from `alphatracker-assistant/requirements.txt` (regenerate steps are in
-    that file). Railway: second service from the same repo, **Root Directory = `alphatracker-assistant`**, health
-    check path `/health`, public domain `https://refreshing-clarity-production-b815.up.railway.app`. Its variables
-    (names only): `GEMINI_API_KEY`, `SPRING_API_BASE_URL`, `CORS_ALLOWED_ORIGINS` (the Vercel origin, NO trailing
-    slash, https), `TIMEZONE`, `RATE_LIMIT_GLOBAL_PER_DAY` (start low). No quote marks around values.
-    Verified from outside: `/health` 200, no token -> 401, CORS allows the Vercel origin and refuses others.
-    *First live failure, and its cause:* the chat said "The assistant is unavailable right now." because Vercel's
-    `VITE_ASSISTANT_API_URL` was entered WITHOUT `https://`, so axios treated it as a relative path and every
-    request went to the Vercel site itself (HTTP 405, no explanation). Found by reading the baked `baseURL` out of
-    the live JavaScript bundle. Fix: set the variable with `https://` and REDEPLOY Vercel (the value is baked in at
-    build time). The frontend now also normalises a scheme-less base URL (`normalizeBaseUrl`), so this can't recur.
-    *Open:* `/docs` (Swagger) is publicly reachable on the assistant; harmless but could be disabled in production.
+  - [x] 5. **Docker image + deploy.**
   - [~] 6. click-through. Done locally on the owner's real data (works well). Still to do: on the deployed site,
     after the Vercel variable is fixed and redeployed.
 
