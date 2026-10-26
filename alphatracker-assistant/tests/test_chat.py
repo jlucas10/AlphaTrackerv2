@@ -56,6 +56,21 @@ def test_a_bad_or_missing_token_is_rejected_before_any_model_call_is_paid_for():
     assert llm.calls == []
 
 
+def test_a_failed_model_call_logs_the_status_so_a_broken_deploy_can_be_diagnosed(caplog):
+    class RejectedKey:
+        def generate(self, system, messages, tools):
+            raise LLMError("Gemini request failed (HTTP 400).", retryable=False)
+
+    client = client_for(RejectedKey(), FakeSpring(by_path={"/accounts": ACCOUNTS}))
+
+    with caplog.at_level("WARNING", logger="assistant.chat"):
+        response = client.post("/chat", headers=AUTH, json={"message": "hi"})
+
+    assert response.status_code == 502
+    assert "HTTP 400" in caplog.text and "retryable=False" in caplog.text    # what the operator needs
+    assert "jwt-abc" not in caplog.text                                     # and still nothing secret
+
+
 def test_failures_map_to_distinct_statuses_without_leaking_internals():
     ask = {"message": "hi"}
     ok_accounts = {"/accounts": ACCOUNTS}

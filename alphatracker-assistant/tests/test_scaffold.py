@@ -27,6 +27,23 @@ def test_blank_env_values_fall_back_to_defaults(monkeypatch):
     assert settings.spring_api_base_url == "http://localhost:8080/api/v1"
 
 
+def test_values_pasted_into_a_hosting_dashboard_are_cleaned_of_quotes_spaces_and_slashes():
+    settings = Settings(
+        _env_file=None,
+        gemini_api_key='  "AIzaFakeKey123"\n',                    # shell-example quotes plus a stray newline
+        gemini_model="'gemini-3.8-flash'",
+        spring_api_base_url=" https://backend.example/api/v1 ",
+        timezone='"America/New_York"',
+        cors_allowed_origins="https://a.vercel.app/, 'https://b.example/'",   # trailing slashes would never match an Origin
+    )
+
+    assert settings.gemini_api_key == "AIzaFakeKey123"
+    assert settings.gemini_model == "gemini-3.8-flash"
+    assert settings.spring_api_base_url == "https://backend.example/api/v1"
+    assert settings.timezone == "America/New_York"
+    assert settings.cors_origin_list == ["https://a.vercel.app", "https://b.example"]
+
+
 def test_unknown_timezone_fails_at_startup():
     with pytest.raises(Exception):
         Settings(_env_file=None, timezone="Not/AZone")

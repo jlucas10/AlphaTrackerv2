@@ -47,6 +47,19 @@ class Settings(BaseSettings):
     # Any http://localhost:<port> is always allowed for local development.
     cors_allowed_origins: str = ""
 
+    @field_validator("gemini_api_key", "gemini_model", "spring_api_base_url", "timezone", "cors_allowed_origins",
+                     mode="before")
+    @classmethod
+    def _tidy_pasted_value(cls, value):
+        """Hosting dashboards make it easy to paste a value with stray spaces, a trailing newline, or the
+        quote marks from a shell example (this already broke S3_BUCKET once). None of those is ever part of a
+        real key or URL, so they are removed instead of becoming a mystery failure."""
+        if isinstance(value, str):
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1].strip()
+        return value
+
     @field_validator("timezone")
     @classmethod
     def _timezone_must_exist(cls, value: str) -> str:
@@ -55,7 +68,10 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+        # No trailing slash: a browser's Origin header never has one, so "https://x.app/" would never match
+        # and every request from that site would be blocked.
+        cleaned = (o.strip().strip("\"'").strip().rstrip("/") for o in self.cors_allowed_origins.split(","))
+        return [o for o in cleaned if o]
 
 
 @lru_cache
