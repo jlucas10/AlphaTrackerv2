@@ -91,7 +91,10 @@ def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM
             raise HTTPException(503, "The trading data service is unavailable right now. Try again shortly.") from None
         except LLMError as exc:
             # Log the class of failure only; never the request, the token, or message text.
-            logger.warning("model call failed (retryable=%s)", exc.retryable)
+            # `exc` is OUR text ("Gemini request failed (HTTP 400)."), never Google's body or a key. Without the
+            # status code a failed deploy can't be told apart: 400/403 = key or permissions, 404 = model,
+            # 429 = quota, 5xx = Google itself.
+            logger.warning("model call failed (retryable=%s): %s", exc.retryable, exc)
             status = 503 if exc.retryable else 502
             raise HTTPException(status, "The assistant is unavailable right now. Try again shortly.") from None
         except AgentError:
