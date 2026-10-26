@@ -518,13 +518,13 @@ from a browser, one runaway client or loop must not be able to burn the budget.
   - [x] 1. **API + state (no UI yet).**
   - [x] 2. **Panel UI + Markdown.**
   - [x] 3. **Error/loading states.** "Looking through your trades…" while waiting; an error box per kind (expired
-    login -> "Sign in again"; others -> "Try again", which re-sends without duplicating). On a 429 the panel counts
-    down live and keeps Send disabled until `Retry-After` passes. The deadline is fixed once at arrival (not
-    "subtract 1 per tick", which drifts and is throttled in background tabs). The service's 429 message now says
-    WHAT happened and the header says WHEN, so the UI never shows a frozen number beside a live one.
+       login -> "Sign in again"; others -> "Try again", which re-sends without duplicating). On a 429 the panel counts
+       down live and keeps Send disabled until `Retry-After` passes. The deadline is fixed once at arrival (not
+       "subtract 1 per tick", which drifts and is throttled in background tabs). The service's 429 message now says
+       WHAT happened and the header says WHEN, so the UI never shows a frozen number beside a live one.
   - [x] 4. **Sidebar entry + starter chips.**
-  - [ ] 5. build Docker image, deploy service, set CORS + env vars
-  - [ ] 6. live click-through (real browser, real login).
+  - [ ] 5. build Docker image, deploy service, set CORS + env vars (not done yet; the Dockerfile has never been built)
+  - [~] 6. click-through. Done locally on the owner's real data (works well). Still to do: on the deployed site.
 
 #### Phase 6 — pgvector search over journal notes — LATER (not scheduled)
 
