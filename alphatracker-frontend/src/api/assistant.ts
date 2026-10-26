@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { attachToken } from './apiClient';
 import type { ChatReply, HistoryTurn } from '../types/Assistant';
+import { normalizeBaseUrl } from '../utils/assistantChat';
 
 // The assistant is a separate service from the Spring backend, so it has its own base URL.
 // Same pattern as apiClient: baked in at build time, with a localhost fallback for `npm run dev`.
 const assistantClient = axios.create({
-  baseURL: import.meta.env.VITE_ASSISTANT_API_URL ?? 'http://localhost:8000',
+  baseURL: normalizeBaseUrl(import.meta.env.VITE_ASSISTANT_API_URL, 'http://localhost:8000'),
   headers: { 'Content-Type': 'application/json' },
   // The slowest answer measured was about 36 seconds (a corrected answer is a second model round
   // trip), and there is no streaming, so allow comfortably more before giving up.

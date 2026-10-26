@@ -31,6 +31,19 @@ export function buildHistory(messages: ChatMessage[]): HistoryTurn[] {
   return recent;
 }
 
+// ------------------------------------------------------------------ configuration
+// A base URL typed into a hosting dashboard often loses its scheme ("my-service.up.railway.app").
+// Axios then treats it as a RELATIVE path, so every request goes to the website itself and fails with
+// a 405 that explains nothing (this happened on the first deploy). So: add https:// when it is missing
+// (http:// for localhost), trim spaces, and drop trailing slashes. Empty means "use the fallback".
+export function normalizeBaseUrl(raw: string | undefined, fallback: string): string {
+  const value = raw?.trim();
+  if (!value) return fallback;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
+  const scheme = /^(localhost|127\.0\.0\.1)(:|\/|$)/.test(value) ? 'http' : 'https';
+  return (hasScheme ? value : `${scheme}://${value}`).replace(/\/+$/, '');
+}
+
 // ------------------------------------------------------------------ errors
 export class AssistantError extends Error {
   readonly kind: AssistantErrorKind;
