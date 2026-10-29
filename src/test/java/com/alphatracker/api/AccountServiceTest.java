@@ -320,6 +320,117 @@ public class AccountServiceTest {
         }
     }
 
+    // ---- account status (updateStatus) and funded-account lineage ----
+
+    private Account ownedAccount(Account account) {
+        when(accountRepository.findByIdAndUserId(account.getId(), 1L)).thenReturn(Optional.of(account));
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        return account;
+    }
+
+    @Test
+    @DisplayName("Marking an evaluation passed records it: status, closing time, and active=false (a legacy null status reads as ACTIVE)")
+    void testMarkingAnEvaluationPassed() {
+        Account account = ownedAccount(evaluation(DrawdownMode.PER_TRADE_CLOSE, 3000.0));
+        assertNull(account.getStatus());                                  // an account created before the column existed
+        assertEquals(AccountStatus.ACTIVE, account.currentStatus());
+
+        AccountResponse response = accountService.updateStatus(7L, AccountStatus.PASSED, mockUser);
+
+        assertEquals(AccountStatus.PASSED, response.getStatus());
+        assertNotNull(response.getClosedAt());
+        assertFalse(response.getActive());
+        verify(accountRepository, times(1)).save(account);
+    }
+
+    @Test
+    @DisplayName("Only an evaluation can be marked passed, but a funded account can fail")
+    void testOnlyEvaluationsCanPass() {
+        Account funded = ownedAccount(Account.builder().id(8L).accountType(AccountType.FUNDED).startingBalance(50000.0)
+                .maxDrawdown(2000.0).drawdownMode(DrawdownMode.PER_TRADE_CLOSE).build());
+
+        assertThrows(IllegalArgumentException.class, () -> accountService.updateStatus(8L, AccountStatus.PASSED, mockUser));
+        verify(accountRepository, never()).save(any());
+
+        assertEquals(AccountStatus.FAILED, accountService.updateStatus(8L, AccountStatus.FAILED, mockUser).getStatus());
+        assertEquals(AccountStatus.FAILED, funded.getStatus());
+    }
+
+    @Test
+    @DisplayName("Reopening clears the closing time, and repeating a status keeps the original closing time")
+    void testReopeningAndRepeatingAStatus() {
+        Account account = ownedAccount(evaluation(DrawdownMode.PER_TRADE_CLOSE, 3000.0));
+
+        accountService.updateStatus(7L, AccountStatus.PASSED, mockUser);
+        LocalDateTime firstClosed = account.getClosedAt();
+        assertNotNull(firstClosed);
+
+        accountService.updateStatus(7L, AccountStatus.PASSED, mockUser);   // same status again: nothing changes
+        assertSame(firstClosed, account.getClosedAt());
+
+        AccountResponse reopened = accountService.updateStatus(7L, AccountStatus.ACTIVE, mockUser);
+        assertEquals(AccountStatus.ACTIVE, reopened.getStatus());
+        assertNull(reopened.getClosedAt());
+        assertTrue(reopened.getActive());
+    }
+
+    @Test
+    @DisplayName("An unknown or another trader's account, or a missing status, is rejected and nothing is saved")
+    void testStatusChangeIsOwnershipCheckedAndValidated() {
+        when(accountRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> accountService.updateStatus(99L, AccountStatus.FAILED, mockUser));
+        assertThrows(IllegalArgumentException.class, () -> accountService.updateStatus(7L, null, mockUser));
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Closing the primary account un-sets primary (so new trades stop attaching to it); reopening does not restore it")
+    void testClosingThePrimaryAccountUnsetsPrimary() {
+        Account primary = evaluation(DrawdownMode.PER_TRADE_CLOSE, 3000.0);
+        primary.setIsPrimary(true);
+        ownedAccount(primary);
+
+        AccountResponse closed = accountService.updateStatus(7L, AccountStatus.FAILED, mockUser);
+        assertFalse(closed.getIsPrimary());
+        assertFalse(primary.getIsPrimary());
+
+        accountService.updateStatus(7L, AccountStatus.ACTIVE, mockUser);
+        assertFalse(primary.getIsPrimary());
+    }
+
+    @Test
+    @DisplayName("A funded account can record which evaluation it came from, and only a real one of the trader's own")
+    void testFundedAccountLineage() {
+        ownedAccount(evaluation(DrawdownMode.PER_TRADE_CLOSE, 3000.0));          // the trader's evaluation, id 7
+
+        AccountRequest funded = AccountRequest.builder().name("Apex Funded").firm("Apex").accountType(AccountType.FUNDED)
+                .startingBalance(50000.0).maxDrawdown(2000.0).promotedFromAccountId(7L).build();
+        AccountResponse created = accountService.createAccount(funded, mockUser);
+        assertEquals(7L, created.getPromotedFromAccountId());
+        assertEquals(AccountStatus.ACTIVE, created.getStatus());
+
+        // A new EVALUATION cannot claim to be promoted from anything.
+        AccountRequest notFunded = AccountRequest.builder().name("x").firm("Apex").accountType(AccountType.EVALUATION)
+                .startingBalance(50000.0).maxDrawdown(2000.0).promotedFromAccountId(7L).build();
+        assertThrows(IllegalArgumentException.class, () -> accountService.createAccount(notFunded, mockUser));
+
+        // The source must exist for THIS trader...
+        when(accountRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.empty());
+        AccountRequest foreign = AccountRequest.builder().name("x").firm("Apex").accountType(AccountType.FUNDED)
+                .startingBalance(50000.0).maxDrawdown(2000.0).promotedFromAccountId(99L).build();
+        assertThrows(IllegalArgumentException.class, () -> accountService.createAccount(foreign, mockUser));
+
+        // ...and must itself be an evaluation.
+        Account anotherFunded = Account.builder().id(8L).accountType(AccountType.FUNDED).startingBalance(50000.0)
+                .maxDrawdown(2000.0).build();
+        when(accountRepository.findByIdAndUserId(8L, 1L)).thenReturn(Optional.of(anotherFunded));
+        AccountRequest fromFunded = AccountRequest.builder().name("x").firm("Apex").accountType(AccountType.FUNDED)
+                .startingBalance(50000.0).maxDrawdown(2000.0).promotedFromAccountId(8L).build();
+        assertThrows(IllegalArgumentException.class, () -> accountService.createAccount(fromFunded, mockUser));
+    }
+
     @Test
     @DisplayName("The progress facts are part of every account response")
     void testProgressReachesTheAccountResponse() {

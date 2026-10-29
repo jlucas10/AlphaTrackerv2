@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -193,6 +194,19 @@ public class AccountService {
             throw new IllegalArgumentException("Trailing stop balance must be greater than 0.");
         }
 
+        // Lineage: a funded account created after passing an evaluation can record which one it came from.
+        // Checked now so the stored id is always a real evaluation that belongs to this trader.
+        if (request.getPromotedFromAccountId() != null) {
+            if (request.getAccountType() != AccountType.FUNDED) {
+                throw new IllegalArgumentException("Only a funded account can be promoted from an evaluation.");
+            }
+            Account source = accountRepository.findByIdAndUserId(request.getPromotedFromAccountId(), user.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("Account not found or does not belong to user."));
+            if (source.getAccountType() != AccountType.EVALUATION) {
+                throw new IllegalArgumentException("A funded account can only be promoted from an evaluation account.");
+            }
+        }
+
         // A brand new trader has nothing to choose from, so their very first
         // account becomes primary automatically — otherwise new trades logged
         // without picking an account would have nowhere to attach until the
@@ -211,11 +225,47 @@ public class AccountService {
                 .trailingStopsAtBalance(request.getTrailingStopsAtBalance())
                 .isPrimary(isFirstAccount)
                 .active(true)
+                .status(AccountStatus.ACTIVE)
+                .promotedFromAccountId(request.getPromotedFromAccountId())
                 .user(user)
                 .build();
 
         Account saved = accountRepository.save(account);
         return toResponse(saved);
+    }
+
+    // Marks an account PASSED, FAILED, or back to ACTIVE. The replay only SUGGESTS a status (it can see a
+    // target was hit, not whether the firm's other rules were met), so this is the trader's explicit call.
+    @Transactional
+    public AccountResponse updateStatus(Long accountId, AccountStatus requested, User user) {
+        if (requested == null) {
+            throw new IllegalArgumentException("Status is required.");
+        }
+        Account account = accountRepository.findByIdAndUserId(accountId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or does not belong to user."));
+
+        // A funded account has no profit target to pass; it can only fail (or be reopened).
+        if (requested == AccountStatus.PASSED && account.getAccountType() != AccountType.EVALUATION) {
+            throw new IllegalArgumentException("Only an evaluation account can be marked passed.");
+        }
+
+        // Asking for the status it already has changes nothing, so the original closing time survives.
+        if (account.currentStatus() != requested) {
+            boolean closing = requested != AccountStatus.ACTIVE;
+            account.setStatus(requested);
+            account.setActive(!closing);
+            account.setClosedAt(closing ? LocalDateTime.now() : null);
+
+            // Trades logged without choosing an account attach to the PRIMARY account (TradeService). A
+            // finished account must not keep collecting them, so closing the primary un-sets it. Until a
+            // new primary is chosen those trades are unassigned, the same as for a trader with no primary
+            // yet; reopening does not restore the flag.
+            if (closing && Boolean.TRUE.equals(account.getIsPrimary())) {
+                account.setIsPrimary(false);
+            }
+        }
+
+        return toResponse(accountRepository.save(account));
     }
 
     // Marks one account primary and unsets any other, so exactly one account

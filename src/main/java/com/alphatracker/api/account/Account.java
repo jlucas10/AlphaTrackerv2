@@ -64,6 +64,26 @@ public class Account {
     @Builder.Default
     private Boolean active = true;
 
+    // Where the account is in its life (see AccountStatus). NULLABLE on purpose: ddl-auto=update cannot add
+    // a NOT NULL column to a table that already holds rows, so every account created before this column
+    // existed has null here and reads as ACTIVE (see currentStatus()). Supersedes the boolean `active`
+    // above, which AccountService keeps in step but nothing reads any more.
+    @Enumerated(EnumType.STRING)
+    private AccountStatus status;
+
+    // When the account was marked PASSED or FAILED; null while ACTIVE.
+    private LocalDateTime closedAt;
+
+    // For a funded account created after passing an evaluation: the id of that evaluation. A plain id and
+    // not a foreign key on purpose: it is display lineage ("funded from Apex 50k #1"), and a real FK would
+    // only complicate deleting accounts later. The UI looks the name up in the accounts list.
+    private Long promotedFromAccountId;
+
+    // Not a getter (no "get" prefix), so it is never serialized or mistaken for a column.
+    public AccountStatus currentStatus() {
+        return status == null ? AccountStatus.ACTIVE : status;
+    }
+
     private LocalDateTime createdAt; // Account creation metadata
 
     @ManyToOne(fetch = FetchType.LAZY)

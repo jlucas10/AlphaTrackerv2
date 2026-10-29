@@ -19,4 +19,6 @@ public class AccountRequest {
     private Double maxDrawdown;
     private DrawdownMode drawdownMode;
     private Double trailingStopsAtBalance;
+    // Optional: set when this funded account is being created after passing an evaluation.
+    private Long promotedFromAccountId;
 }

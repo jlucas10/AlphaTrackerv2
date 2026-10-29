@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAssistant } from '../../hooks/useAssistant';
+import { initialOf } from '../../utils/formatters';
 
 interface SidebarProps {
   active: 'dashboard' | 'journal';
@@ -17,7 +18,8 @@ interface SidebarProps {
 // triggers on its own. A backlog item exists in CONTEXT.md for a real
 // /accounts page; this nav entry can come back once that's built.
 export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const firstName = user?.firstName?.trim() ?? '';
   const { isOpen, toggle } = useAssistant();
   const navigate = useNavigate();
 
@@ -58,10 +60,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
       <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white font-bold text-sm">
-            J
+            {initialOf(firstName)}
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900">Josiah</p>
+            {/* The signed-in user's own first name. While it is still loading (or if the lookup failed) a
+                neutral label shows instead of a wrong or empty name. */}
+            <p className="text-sm font-bold text-gray-900">{firstName || 'Your account'}</p>
             <button onClick={logout} className="text-xs text-red-500 hover:underline font-semibold">
               Sign Out
             </button>
