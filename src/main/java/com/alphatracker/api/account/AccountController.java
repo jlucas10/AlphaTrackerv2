@@ -36,6 +36,16 @@ public class AccountController {
         return ResponseEntity.ok(accountService.setPrimaryAccount(id, user));
     }
 
+    // Mark an account PASSED / FAILED, or reopen it (ACTIVE). Ownership and the "only evaluations can
+    // pass" rule are enforced in the service.
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<AccountResponse> updateStatus(
+            @PathVariable Long id,
+            @RequestBody AccountStatusRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accountService.updateStatus(id, request.getStatus(), user));
+    }
+
     // Preview endpoint the frontend calls before showing the backfill confirm
     // step, so the trader sees how many trades would move before committing.
     @GetMapping("/unassigned-trades/count")

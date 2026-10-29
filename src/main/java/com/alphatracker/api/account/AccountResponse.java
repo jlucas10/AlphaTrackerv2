@@ -33,6 +33,10 @@ public class AccountResponse {
     private LocalDate breachedOn;
     private AccountStatus suggestedStatus;
     private Boolean isPrimary;
+    private AccountStatus status;
+    private LocalDateTime closedAt;
+    private Long promotedFromAccountId;
+    // Kept for existing clients; now simply "status is ACTIVE".
     private Boolean active;
     private LocalDateTime createdAt;
 
@@ -59,7 +63,10 @@ public class AccountResponse {
                 .breachedOn(progress.breachedOn())
                 .suggestedStatus(progress.suggestedStatus())
                 .isPrimary(Boolean.TRUE.equals(account.getIsPrimary()))
-                .active(account.getActive())
+                .status(account.currentStatus())
+                .closedAt(account.getClosedAt())
+                .promotedFromAccountId(account.getPromotedFromAccountId())
+                .active(account.currentStatus() == AccountStatus.ACTIVE)
                 .createdAt(account.getCreatedAt())
                 .build();
     }

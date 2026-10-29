@@ -555,8 +555,7 @@ saves (so a mistaken "passed" never locks anyone out).
 **Items (stop after each):**
 
 - [x] 1. **Replay + progress (backend).**
-- [ ] 2. `Account.status` (+ `closedAt`), `PATCH /api/v1/accounts/{id}/status` (only EVALUATION can be PASSED; ACTIVE
-     reopens), `promotedFromAccountId` on create. `active` is superseded; null status reads as ACTIVE.
+- [x] 2. **Status + PATCH + lineage.**
 - [ ] 3. UI: target progress bar, "target reached / floor breached" banners, PASSED/FAILED chips.
 - [ ] 4. Pass flow: "Mark as passed" opens the funded-account setup prefilled (firm, balance, drawdown) with lineage.
 - [ ] 5. Trade entry warns (but still saves) when the chosen account is closed.
