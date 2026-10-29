@@ -499,20 +499,15 @@ from a browser, one runaway client or loop must not be able to burn the budget.
 
 **Design:**
 
-- **Files:** `components/assistant/ChatPanel.tsx`, `hooks/useAssistant.ts` (owns messages, loading, errors),
-  `api/assistant.ts` (own axios instance pointed at `VITE_ASSISTANT_API_URL`, reusing the existing JWT).
-- **Conversation lives in the browser** (the service is stateless): the last 20 turns are sent with each
-  message; "Clear" resets it. Kept in memory / `sessionStorage`, not `localStorage` (trading notes are private).
-- **Answers render as Markdown** (the model emits bold/lists/headings) via `react-markdown`, with raw HTML
-  disabled so model/journal text can never inject markup.
+- **Files:**
+- **Conversation lives in the browser**
+- **Answers render as Markdown**
 - **Shows its work:** a collapsed "Used: breakdown by instrument, this month" line per answer, from the
   `tool_calls` the service already returns.
 - **Honest waiting and errors:** answers take 4–18 s (no streaming), so a "thinking…" state; 401 → prompts
   re-login, 429 → "slow down" with the wait time, 502/503 → "assistant unavailable, try again".
 - **Starter questions** as chips so the first use is obvious; amber neutral styling stays consistent with the rest.
-- **Deployment:** assistant service as a second Railway service (root dir `alphatracker-assistant`, variables
-  `GEMINI_API_KEY`, `SPRING_API_BASE_URL`, `CORS_ALLOWED_ORIGINS`=the Vercel origin); Vercel gets
-  `VITE_ASSISTANT_API_URL`. Build the Dockerfile locally first (never run yet).
+- **Deployment:**
 - **Needs first:** Phase 4 (rate limiting) and the `TIMEZONE` decision.
 - **Steps:**
   - [x] 1. **API + state (no UI yet).**
@@ -531,6 +526,43 @@ from a browser, one runaway client or loop must not be able to burn the budget.
 
 Semantic search over the trader's journal ("when did I write about revenge trading?"). Needs embeddings,
 a vector column/extension on Neon, and a new read-only tool. Design when Phases 3–5 are done.
+
+### Sprint 4.6 — Account lifecycle: profit target & drawdown breach — IN PROGRESS
+
+**Problem:** `profitTarget` was stored and returned but nothing read it: no progress, no "target reached", and
+no "failed" state when the drawdown floor was breached (the gauge just stopped at $0 buffer). This picks up the
+core of the backlog item below.
+
+**Decided (owner):** build progress + pass flow + failure together; the app DETECTS and the trader CONFIRMS (firms
+add rules the app can't see: minimum trading days, consistency); logging a trade on a closed account WARNS but still
+saves (so a mistaken "passed" never locks anyone out).
+
+**Rules (all derived from the closed-trade replay, never stored):**
+
+- One replay (`AccountService.replay`) now answers the drawdown floor AND the pass/fail facts, so they can't disagree.
+  The drawdown mode decides WHEN the account is judged: `PER_TRADE_CLOSE` after every closed trade; `END_OF_DAY` judges
+  the high-water mark and the target at the day's close, but checks a breach after every trade against the floor
+  from the previous close (an intraday plunge through the floor still counts).
+- **Breach = a closed-trade balance at or below the floor** (touching counts). Only closed trades exist, so a position
+  that dipped below the floor mid-trade and recovered before closing is invisible.
+- **Target applies to EVALUATION accounts only** (the create form pre-fills a target on funded accounts too). Reached =
+  profit >= target.
+- **First event wins:** `suggestedStatus` is whichever of breach/target came first, by step order not date. An account
+  that breached and then climbed above the target is a FAILURE; one that hit the target and then blew up is a PASS.
+- New response fields: `profit`, `targetProgress` (profit/target, may exceed 1), `targetReachedOn`, `breachedOn`,
+  `suggestedStatus`. Existing `highWaterMark` / `drawdownFloor` results are unchanged (the existing drawdown tests pin that).
+
+**Items (stop after each):**
+
+- [x] 1. **Replay + progress (backend).**
+- [ ] 2. `Account.status` (+ `closedAt`), `PATCH /api/v1/accounts/{id}/status` (only EVALUATION can be PASSED; ACTIVE
+     reopens), `promotedFromAccountId` on create. `active` is superseded; null status reads as ACTIVE.
+- [ ] 3. UI: target progress bar, "target reached / floor breached" banners, PASSED/FAILED chips.
+- [ ] 4. Pass flow: "Mark as passed" opens the funded-account setup prefilled (firm, balance, drawdown) with lineage.
+- [ ] 5. Trade entry warns (but still saves) when the chosen account is closed.
+- [ ] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the
+     server's number (the model can't subtract); optionally seed a target in the eval data.
+- [ ] 7. Verify with demo data that really hits a target; update README and CONTEXT.
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 

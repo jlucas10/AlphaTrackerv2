@@ -1,5 +1,6 @@
 package com.alphatracker.api.account;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
@@ -24,14 +25,21 @@ public class AccountResponse {
     private Double trailingStopsAtBalance;
     private Double highWaterMark;
     private Double drawdownFloor;
+    // Profit-target progress and breach facts, from the same replay as the two figures above
+    // (AccountService.replay). Derived on every read, never stored.
+    private Double profit;
+    private Double targetProgress;
+    private LocalDate targetReachedOn;
+    private LocalDate breachedOn;
+    private AccountStatus suggestedStatus;
     private Boolean isPrimary;
     private Boolean active;
     private LocalDateTime createdAt;
 
-    // highWaterMark/drawdownFloor are computed by AccountService.computeDrawdownSnapshot
+    // highWaterMark/drawdownFloor and the progress fields are computed by AccountService.replay
     // from the account's full trade history, so they're passed in rather than
     // read off the entity the way every other field here is.
-    public static AccountResponse fromEntity(Account account, DrawdownSnapshot snapshot) {
+    public static AccountResponse fromEntity(Account account, DrawdownSnapshot snapshot, AccountProgress progress) {
         return AccountResponse.builder()
                 .id(account.getId())
                 .name(account.getName())
@@ -45,6 +53,11 @@ public class AccountResponse {
                 .trailingStopsAtBalance(account.getTrailingStopsAtBalance())
                 .highWaterMark(snapshot.highWaterMark())
                 .drawdownFloor(snapshot.drawdownFloor())
+                .profit(progress.profit())
+                .targetProgress(progress.targetProgress())
+                .targetReachedOn(progress.targetReachedOn())
+                .breachedOn(progress.breachedOn())
+                .suggestedStatus(progress.suggestedStatus())
                 .isPrimary(Boolean.TRUE.equals(account.getIsPrimary()))
                 .active(account.getActive())
                 .createdAt(account.getCreatedAt())

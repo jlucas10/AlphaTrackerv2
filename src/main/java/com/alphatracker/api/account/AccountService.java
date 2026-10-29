@@ -26,7 +26,7 @@ public class AccountService {
     public List<AccountResponse> getUserAccounts(User user) {
         return accountRepository.findAllByUserId(user.getId())
                 .stream()
-                .map(account -> AccountResponse.fromEntity(account, computeDrawdownSnapshot(account)))
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -35,40 +35,135 @@ public class AccountService {
     // (if set) trailingStopsAtBalance. See CONTEXT.md "Drawdown Rules (Resolved)".
     @Transactional(readOnly = true)
     public DrawdownSnapshot computeDrawdownSnapshot(Account account) {
+        return replay(account).drawdown();
+    }
+
+    // Profit-target progress and drawdown-breach facts, from the SAME replay as the floor above.
+    @Transactional(readOnly = true)
+    public AccountProgress computeProgress(Account account) {
+        return replay(account).progress();
+    }
+
+    // Everything one pass over an account's history can tell us.
+    private record Replay(DrawdownSnapshot drawdown, AccountProgress progress) {
+    }
+
+    // The single replay behind the drawdown floor AND the pass/fail facts, so the two can never
+    // disagree about how an account's history is read.
+    //
+    // The drawdown mode decides WHEN the account is judged, exactly as it already decides when the
+    // high-water mark moves:
+    //   PER_TRADE_CLOSE  after every closed trade (the high-water mark, floor and target all update)
+    //   END_OF_DAY       the high-water mark and the profit target are judged at the day's close, but
+    //                    a breach is checked after every trade against the floor in force from the
+    //                    PREVIOUS close, so an intraday plunge through the floor still counts.
+    // Only closed trades exist in this data: a position that dipped below the floor mid-trade and
+    // recovered before closing cannot be seen.
+    private Replay replay(Account account) {
         List<Trade> trades = tradeRepository.findAllByAccountIdOrderByTradeDateAsc(account.getId());
         DrawdownMode mode = account.getDrawdownMode() == null ? DrawdownMode.END_OF_DAY : account.getDrawdownMode();
+        boolean perTrade = mode == DrawdownMode.PER_TRADE_CLOSE;
 
-        double highWaterMark = account.getStartingBalance();
-        double running = account.getStartingBalance();
+        double start = account.getStartingBalance();
+        Double target = targetOf(account);
 
-        if (mode == DrawdownMode.PER_TRADE_CLOSE) {
-            for (Trade trade : trades) {
-                running = round(running + trade.getProfitLoss());
-                highWaterMark = Math.max(highWaterMark, running);
+        double balance = start;
+        double highWaterMark = start;
+        double floor = floorFor(account, highWaterMark);
+
+        // "Which happened first" is decided by a running step count, not by date: a breach and a
+        // target hit can share a day, and the day's trades come before its close.
+        int step = 0;
+        int breachStep = -1;
+        int targetStep = -1;
+        LocalDate breachedOn = null;
+        LocalDate targetReachedOn = null;
+
+        // `trades` is sorted ascending by tradeDate; LinkedHashMap keeps the days in that order.
+        Map<LocalDate, List<Trade>> days = trades.stream()
+                .collect(Collectors.groupingBy(
+                        trade -> trade.getTradeDate().toLocalDate(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        for (Map.Entry<LocalDate, List<Trade>> day : days.entrySet()) {
+            double dayStart = balance;
+            double dayPnl = 0;
+
+            for (Trade trade : day.getValue()) {
+                step++;
+                dayPnl += trade.getProfitLoss();
+                // END_OF_DAY: a day's balance is dayStart + the day's P&L, rounded ONCE, which is how the
+                // original engine computed a closing balance (so the high-water mark is unchanged).
+                balance = perTrade
+                        ? round(balance + trade.getProfitLoss())
+                        : round(dayStart + dayPnl);
+
+                if (perTrade) {
+                    highWaterMark = Math.max(highWaterMark, balance);
+                    floor = floorFor(account, highWaterMark);
+                }
+                // At or below the floor = the account is blown (<=, not <: touching it is enough).
+                if (breachedOn == null && balance <= round(floor)) {
+                    breachedOn = day.getKey();
+                    breachStep = step;
+                }
+                if (perTrade && target != null && targetReachedOn == null && round(balance - start) >= target) {
+                    targetReachedOn = day.getKey();
+                    targetStep = step;
+                }
             }
-        } else {
-            // END_OF_DAY: only the balance at the close of each day can raise the
-            // high-water mark, so an intraday peak given back before the day ends
-            // never counts. LinkedHashMap preserves chronological day order because
-            // `trades` is already sorted ascending by tradeDate.
-            Map<LocalDate, Double> dailyPnl = trades.stream()
-                    .collect(Collectors.groupingBy(
-                            trade -> trade.getTradeDate().toLocalDate(),
-                            LinkedHashMap::new,
-                            Collectors.summingDouble(Trade::getProfitLoss)));
 
-            for (double dayPnl : dailyPnl.values()) {
-                running = round(running + dayPnl);
-                highWaterMark = Math.max(highWaterMark, running);
+            if (!perTrade) {
+                // The close of the day: now the high-water mark, the floor for tomorrow, and the target.
+                highWaterMark = Math.max(highWaterMark, balance);
+                floor = floorFor(account, highWaterMark);
+                if (target != null && targetReachedOn == null && round(balance - start) >= target) {
+                    targetReachedOn = day.getKey();
+                    targetStep = ++step;
+                }
             }
         }
 
+        double profit = round(balance - start);
+        Double targetProgress = target == null ? null : Math.round(profit / target * 10_000.0) / 10_000.0;
+
+        // Whichever came first decides the suggestion. An account that breached and then recovered
+        // above the target is a failure, not a pass.
+        AccountStatus suggested = null;
+        if (breachStep >= 0 && (targetStep < 0 || breachStep < targetStep)) {
+            suggested = AccountStatus.FAILED;
+        } else if (targetStep >= 0) {
+            suggested = AccountStatus.PASSED;
+        }
+
+        return new Replay(
+                new DrawdownSnapshot(round(highWaterMark), round(floor)),
+                new AccountProgress(profit, targetProgress, targetReachedOn, breachedOn, suggested));
+    }
+
+    // Only an evaluation has a profit target to hit. A funded account may still carry a number in the
+    // field (the create form pre-fills one), but it is not something that account is working toward.
+    private Double targetOf(Account account) {
+        boolean applies = account.getAccountType() == AccountType.EVALUATION
+                && account.getProfitTarget() != null
+                && account.getProfitTarget() > 0;
+        return applies ? account.getProfitTarget() : null;
+    }
+
+    // See CONTEXT.md "Drawdown Rules (Resolved)": the floor trails the high-water mark by maxDrawdown,
+    // and stops rising once it reaches trailingStopsAtBalance (when one is set).
+    private double floorFor(Account account, double highWaterMark) {
         double rawFloor = highWaterMark - account.getMaxDrawdown();
-        double drawdownFloor = account.getTrailingStopsAtBalance() != null
+        return account.getTrailingStopsAtBalance() != null
                 ? Math.min(rawFloor, account.getTrailingStopsAtBalance())
                 : rawFloor;
+    }
 
-        return new DrawdownSnapshot(round(highWaterMark), round(drawdownFloor));
+    // One place that turns an account into its response, so every endpoint reports the same facts.
+    private AccountResponse toResponse(Account account) {
+        Replay replay = replay(account);
+        return AccountResponse.fromEntity(account, replay.drawdown(), replay.progress());
     }
 
     // Mirrors TradeService.round: keeps replayed dollars clean instead of
@@ -120,7 +215,7 @@ public class AccountService {
                 .build();
 
         Account saved = accountRepository.save(account);
-        return AccountResponse.fromEntity(saved, computeDrawdownSnapshot(saved));
+        return toResponse(saved);
     }
 
     // Marks one account primary and unsets any other, so exactly one account
@@ -142,7 +237,7 @@ public class AccountService {
 
         target.setIsPrimary(true);
         Account saved = accountRepository.save(target);
-        return AccountResponse.fromEntity(saved, computeDrawdownSnapshot(saved));
+        return toResponse(saved);
     }
 
     // Preview count shown before the trader confirms a backfill.
@@ -165,7 +260,7 @@ public class AccountService {
 
         List<Trade> unassigned = tradeRepository.findAllByUserIdAndAccountIsNull(user.getId());
         if (unassigned.isEmpty()) {
-            return new BackfillResult(0, AccountResponse.fromEntity(primary, computeDrawdownSnapshot(primary)));
+            return new BackfillResult(0, toResponse(primary));
         }
 
         double totalPnl = unassigned.stream().mapToDouble(Trade::getProfitLoss).sum();
@@ -177,6 +272,6 @@ public class AccountService {
         primary.setCurrentBalance(round(primary.getCurrentBalance() + totalPnl));
         Account saved = accountRepository.save(primary);
 
-        return new BackfillResult(unassigned.size(), AccountResponse.fromEntity(saved, computeDrawdownSnapshot(saved)));
+        return new BackfillResult(unassigned.size(), toResponse(saved));
     }
 }
