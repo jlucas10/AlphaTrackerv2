@@ -4,22 +4,36 @@ import type { AccountType, CreateAccountPayload, DrawdownMode } from '../../type
 interface CreateAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (payload: CreateAccountPayload) => Promise<void>;
+  // makePrimary is true only when the trader ticked the box, which exists only for a promotion.
+  onSubmit: (payload: CreateAccountPayload, makePrimary: boolean) => Promise<void>;
+  // Starting values for a funded account created after passing an evaluation (see fundedPrefillFrom).
+  // The parent mounts this modal fresh each time it opens, so these only seed the initial state.
+  prefill?: CreateAccountPayload;
+  defaultMakePrimary?: boolean;
 }
 
 export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  prefill,
+  defaultMakePrimary = false,
 }) => {
-  const [name, setName] = useState('');
-  const [firm, setFirm] = useState('');
-  const [accountType, setAccountType] = useState<AccountType>('EVALUATION');
-  const [startingBalance, setStartingBalance] = useState('50000');
-  const [maxDrawdown, setMaxDrawdown] = useState('2000');
-  const [profitTarget, setProfitTarget] = useState('3000');
-  const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>('END_OF_DAY');
-  const [trailingStopsAtBalance, setTrailingStopsAtBalance] = useState('');
+  const promoting = prefill?.promotedFromAccountId != null;
+  const [name, setName] = useState(prefill?.name ?? '');
+  const [firm, setFirm] = useState(prefill?.firm ?? '');
+  const [accountType, setAccountType] = useState<AccountType>(prefill?.accountType ?? 'EVALUATION');
+  const [startingBalance, setStartingBalance] = useState(String(prefill?.startingBalance ?? 50000));
+  const [maxDrawdown, setMaxDrawdown] = useState(String(prefill?.maxDrawdown ?? 2000));
+  // A funded account has no profit target, so a promotion starts with it blank rather than the 3000 default.
+  const [profitTarget, setProfitTarget] = useState(prefill ? '' : '3000');
+  const [drawdownMode, setDrawdownMode] = useState<DrawdownMode>(prefill?.drawdownMode ?? 'END_OF_DAY');
+  const [trailingStopsAtBalance, setTrailingStopsAtBalance] = useState(
+    prefill?.trailingStopsAtBalance != null ? String(prefill.trailingStopsAtBalance) : '',
+  );
+  // Closing the primary evaluation un-sets it, so its funded successor is the natural replacement: the
+  // parent ticks this by default only in that case, so another primary account is never taken over silently.
+  const [makePrimary, setMakePrimary] = useState(defaultMakePrimary);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +54,8 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         profitTarget: profitTarget ? parseFloat(profitTarget) : undefined,
         drawdownMode,
         trailingStopsAtBalance: trailingStopsAtBalance ? parseFloat(trailingStopsAtBalance) : undefined,
-      });
+        promotedFromAccountId: prefill?.promotedFromAccountId,
+      }, promoting && makePrimary);
       // Reset & close
       setName('');
       setFirm('');
@@ -65,7 +80,9 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
-          <h2 className="text-base font-bold text-white font-mono">Create Prop Account</h2>
+          <h2 className="text-base font-bold text-white font-mono">
+            {promoting ? 'Set Up Funded Account' : 'Create Prop Account'}
+          </h2>
           <button
             onClick={onClose}
             className="text-neutral-400 hover:text-neutral-200 transition text-sm font-mono"
@@ -73,6 +90,12 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
             ✕
           </button>
         </div>
+
+        {promoting && (
+          <p className="mt-4 text-xs font-mono text-emerald-400">
+            🎉 Evaluation passed. These values were copied from the evaluation; change anything your funded account does differently.
+          </p>
+        )}
 
         {error && (
           <div className="mt-4 p-3 bg-rose-950/60 border border-rose-800 rounded-lg text-rose-300 text-xs font-mono">
@@ -110,6 +133,8 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
               <label className="block text-xs font-mono text-neutral-400 mb-1">Account Type</label>
               <select
                 value={accountType}
+                // Locked while promoting: the server only accepts a FUNDED account as the successor.
+                disabled={promoting}
                 onChange={(e) => setAccountType(e.target.value as AccountType)}
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-200 font-mono focus:outline-hidden focus:border-emerald-500"
               >
@@ -182,6 +207,18 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
               />
             </div>
           </div>
+
+          {promoting && (
+            <label className="flex items-center gap-2 text-xs font-mono text-neutral-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={makePrimary}
+                onChange={(e) => setMakePrimary(e.target.checked)}
+                className="accent-emerald-500"
+              />
+              Make this my primary account
+            </label>
+          )}
 
           <div className="flex justify-end gap-3 pt-3 border-t border-neutral-800">
             <button

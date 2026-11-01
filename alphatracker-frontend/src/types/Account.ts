@@ -56,4 +56,7 @@ export interface CreateAccountPayload {
     maxDrawdown: number;
     drawdownMode?: DrawdownMode;
     trailingStopsAtBalance?: number;
+    // Set only when this funded account comes from passing an evaluation. The server checks the source is
+    // yours and is an EVALUATION, so a wrong id is rejected rather than trusted.
+    promotedFromAccountId?: number;
 }
