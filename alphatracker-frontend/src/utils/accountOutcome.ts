@@ -71,6 +71,14 @@ export function describeAccountOutcome(
   return null;
 }
 
+// Shown in the trade form when the chosen account is already passed or failed. A warning only: the trade
+// is still saved, so a mistaken "passed" or a late-logged trade never locks the trader out.
+export function closedAccountWarning(account: Pick<Account, 'name' | 'status'> | null | undefined): string | null {
+  if (!account || account.status === 'ACTIVE') return null;
+  const state = account.status === 'PASSED' ? 'passed' : 'failed';
+  return `"${account.name}" is marked ${state}. This trade will still be saved to it. If it belongs on another account, change it above.`;
+}
+
 export function statusLabel(status: Account['status']): string {
   return status === 'PASSED' ? 'Passed' : status === 'FAILED' ? 'Failed' : 'Active';
 }

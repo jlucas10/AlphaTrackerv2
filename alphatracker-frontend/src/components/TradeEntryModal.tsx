@@ -4,6 +4,7 @@ import { deleteAttachment, uploadAttachment } from '../api/attachments';
 import { usePasteScreenshot } from '../hooks/usePasteScreenshot';
 import type { Account } from '../types/Account';
 import type { Attachment } from '../types/Attachment';
+import { closedAccountWarning, statusLabel } from '../utils/accountOutcome';
 import { AttachmentDropzone, type AttachmentDropzoneHandle } from './attachments/AttachmentDropzone';
 import { AttachmentThumbnail } from './attachments/AttachmentThumbnail';
 
@@ -47,6 +48,8 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
     const [accountId, setAccountId] = useState<number | undefined>(
       defaultAccountId ?? (accounts.length > 0 ? accounts[0].id : undefined)
     );
+    // Derived on every render from the current choice, so the warning appears and clears as the trader changes the dropdown.
+    const closedWarning = closedAccountWarning(accounts.find((a) => a.id === accountId));
     // Commission is deliberately absent: the server derives it from the ticker's
     // round-turn fee, so there is nothing here for the trader to mistype.
     const [ticker, setTicker] = useState<string>('MNQ');
@@ -208,9 +211,16 @@ export const TradeEntryModal: React.FC<TradeEntryModalProps> = ({
                                 {accounts.map((acc) => (
                                     <option key={acc.id} value={acc.id}>
                                         {acc.name} — {acc.firm} ({acc.accountType})
+                                        {acc.status !== 'ACTIVE' ? ` · ${statusLabel(acc.status)}` : ''}
                                     </option>
                                 ))}
                             </select>
+                            {/* Warn, never block: the submit button is unaffected by this. */}
+                            {closedWarning && (
+                                <p role="status" className="mt-2 text-xs font-mono text-amber-400">
+                                    ⚠️ {closedWarning}
+                                </p>
+                            )}
                         </div>
                     )}
 

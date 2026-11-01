@@ -557,13 +557,8 @@ saves (so a mistaken "passed" never locks anyone out).
 - [x] 1. **Replay + progress (backend).**
 - [x] 2. **Status + PATCH + lineage.**
 - [x] 3. **UI: target progress bar, banners, PASSED/FAILED chips.**
-- [x] 4. **Pass flow.** Buttons on the account card (`utils/accountActions.ts` decides which: an evaluation gets Mark
-     passed / Mark failed, a funded account only Mark failed, a closed one Reopen). "Mark passed" saves the status FIRST,
-     then opens the funded-account form prefilled from the evaluation (firm, size, drawdown rules; target left blank;
-     type locked to Funded; `promotedFromAccountId` set). "Make primary" box is ticked by default only if the evaluation
-     was the primary. Closing the form leaves the evaluation passed; "Set up funded account" brings the form back. Not
-     exercised in a browser: no DOM test library installed, so the click flow itself is unverified.
-- [ ] 5. Trade entry warns (but still saves) when the chosen account is closed.
+- [x] 4. **Pass flow.**
+- [x] 5. **Trade entry warnings**
 - [ ] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the
      server's number (the model can't subtract); optionally seed a target in the eval data.
 - [ ] 7. Verify with demo data that really hits a target; update README and CONTEXT.
