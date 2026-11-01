@@ -556,7 +556,11 @@ saves (so a mistaken "passed" never locks anyone out).
 
 - [x] 1. **Replay + progress (backend).**
 - [x] 2. **Status + PATCH + lineage.**
-- [ ] 3. UI: target progress bar, "target reached / floor breached" banners, PASSED/FAILED chips.
+- [x] 3. **UI: target progress bar, banners, PASSED/FAILED chips.** The gauge shows the server's `profit` / `profitTarget`
+     / `targetProgress` (bar clamped to 100%, label can read 103%; no "to go" math on the client). Banner wording comes
+     from `describeAccountOutcome` (`utils/accountOutcome.ts`): an ACTIVE account only gets a *suggestion* ("mark it passed
+     once your firm has confirmed"); a PASSED/FAILED account says so and notes when the history disagrees. The account
+     dropdown marks finished accounts " · Passed" / " · Failed".
 - [ ] 4. Pass flow: "Mark as passed" opens the funded-account setup prefilled (firm, balance, drawdown) with lineage.
 - [ ] 5. Trade entry warns (but still saves) when the chosen account is closed.
 - [ ] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the

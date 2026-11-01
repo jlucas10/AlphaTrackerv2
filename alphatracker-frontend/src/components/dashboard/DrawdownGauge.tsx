@@ -1,5 +1,8 @@
 import React from 'react';
 import type { Account } from '../../types/Account';
+import { describeAccountOutcome } from '../../utils/accountOutcome';
+import { formatMoney } from '../../utils/formatters';
+import { AccountStatusChip } from './AccountStatusChip';
 
 interface DrawdownGaugeProps {
   account: Account | null;
@@ -32,6 +35,13 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
 
   const barColor = isSafe ? 'bg-emerald-500' : isWarning ? 'bg-amber-500' : 'bg-red-500';
 
+  // Everything below is the SERVER's replay of the account's trades; nothing is calculated here.
+  const banner = describeAccountOutcome(account);
+  // The target bar exists only for an evaluation that has a target (the server sends null otherwise).
+  const progress = account.targetProgress;
+  const hasTarget = progress != null && !!account.profitTarget;
+  const targetPercent = progress != null ? Math.min(100, Math.max(0, progress * 100)) : 0;
+
   return (
     <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col justify-between">
       <div className="flex items-center justify-between">
@@ -48,6 +58,7 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
               {account.accountType}
             </span>
+            <AccountStatusChip status={account.status} />
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
               {account.drawdownMode === 'PER_TRADE_CLOSE' ? 'Per-Trade' : 'EOD'} DD
             </span>
@@ -61,6 +72,20 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
           </p>
         </div>
       </div>
+
+      {banner && (
+        <div
+          role="status"
+          className={`mt-3 rounded-xl border px-3 py-2.5 text-xs ${
+            banner.tone === 'success'
+              ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+              : 'bg-red-50 border-red-100 text-red-700'
+          }`}
+        >
+          <p className="font-bold">{banner.message}</p>
+          {banner.detail && <p className="mt-0.5 font-medium opacity-80">{banner.detail}</p>}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2 py-2.5 border-y border-gray-100 my-3 text-center">
         <div>
@@ -82,6 +107,27 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
           </p>
         </div>
       </div>
+
+      {hasTarget && progress != null && (
+        <div className="mb-3">
+          <div className="flex justify-between text-[11px] font-semibold text-gray-400 mb-1">
+            <span>Profit target</span>
+            <span>
+              {formatMoney(account.profit)} of {formatMoney(account.profitTarget ?? 0)} · {Math.max(0, Math.round(progress * 100))}%
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label="Progress toward profit target"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(targetPercent)}
+            className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden"
+          >
+            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${targetPercent}%` }} />
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="flex justify-between text-[11px] font-semibold text-gray-400 mb-1">

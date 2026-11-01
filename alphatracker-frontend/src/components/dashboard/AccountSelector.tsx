@@ -1,5 +1,6 @@
 import React from "react";
 import type { Account } from '../../types/Account';
+import { statusLabel } from '../../utils/accountOutcome';
 
 interface AccountSelectorProps {
     accounts: Account[];
@@ -32,6 +33,8 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
                 {acc.name} — {acc.firm} ({acc.accountType})
+                {/* A native <option> can't hold a chip, so a finished account is marked in the text. */}
+                {acc.status !== 'ACTIVE' ? ` · ${statusLabel(acc.status)}` : ''}
               </option>
             ))}
           </select>
