@@ -8,6 +8,8 @@ import { BackfillBanner } from '../components/dashboard/BackfillBanner';
 import { CreateAccountModal } from '../components/dashboard/CreateAccountModal';
 import { TradeEntryModal } from '../components/TradeEntryModal';
 import { computeAvgWinLoss, computeWinRate } from '../utils/pnlAggregations';
+import { fundedPrefillFrom, type AccountAction } from '../utils/accountActions';
+import type { CreateAccountPayload } from '../types/Account';
 import CalendarMatrix from '../components/dashboard/CalendarMatrix';
 import EquityCurveChart from '../components/dashboard/EquityCurveChart';
 import WinRateRing from '../components/dashboard/WinRateRing';
@@ -23,6 +25,7 @@ const DashboardView: React.FC = () => {
     createAccount,
     refetchAccounts,
     setPrimaryAccount,
+    updateAccountStatus,
     unassignedTradeCount,
     backfillUnassignedTrades,
   } = useAccount();
@@ -32,7 +35,13 @@ const DashboardView: React.FC = () => {
 
   // Modal States
   const [isTradeModalOpen, setIsTradeModalOpen] = useState<boolean>(false);
-  const [isCreateAccountOpen, setIsCreateAccountOpen] = useState<boolean>(false);
+  // null = closed. One piece of state instead of a boolean plus loose prefill state: a plain "+ Account"
+  // opens it empty, a pass opens it prefilled. The modal is mounted only while this is set, so every
+  // opening starts from fresh values.
+  const [createAccountForm, setCreateAccountForm] = useState<{
+    prefill?: CreateAccountPayload;
+    defaultMakePrimary: boolean;
+  } | null>(null);
 
   // Calculate Discipline Score dynamically from followedPlan executions
   const disciplineScore =
@@ -50,6 +59,37 @@ const DashboardView: React.FC = () => {
   const { avgWin, avgLoss } = computeAvgWinLoss(trades);
 
   const primaryAccount = accounts.find((a) => a.isPrimary) ?? null;
+
+  // A funded account already created from the selected evaluation (decides whether to offer "Set up funded").
+  const hasSuccessor = selectedAccount
+    ? accounts.some((a) => a.promotedFromAccountId === selectedAccount.id)
+    : false;
+
+  const handleAccountAction = async (action: AccountAction) => {
+    if (!selectedAccount) return;
+    switch (action) {
+      case 'PASS': {
+        // Read before the PATCH: closing the primary un-sets it, and the funded form's "make primary"
+        // box should start ticked only if this evaluation WAS the primary account.
+        const wasPrimary = selectedAccount.isPrimary;
+        // Saved first, the form second: passing is the trader's decision whatever they do with the form,
+        // and Reopen undoes it. If they close the form, "Set up funded account" brings it back.
+        const passed = await updateAccountStatus(selectedAccount.id, 'PASSED');
+        setCreateAccountForm({ prefill: fundedPrefillFrom(passed), defaultMakePrimary: wasPrimary });
+        break;
+      }
+      case 'SETUP_FUNDED':
+        // The evaluation is already closed and no longer primary; tick the box only if nothing else is.
+        setCreateAccountForm({ prefill: fundedPrefillFrom(selectedAccount), defaultMakePrimary: primaryAccount === null });
+        break;
+      case 'FAIL':
+        await updateAccountStatus(selectedAccount.id, 'FAILED');
+        break;
+      case 'REOPEN':
+        await updateAccountStatus(selectedAccount.id, 'ACTIVE');
+        break;
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
@@ -86,7 +126,7 @@ const DashboardView: React.FC = () => {
                 accounts={accounts}
                 selectedAccountId={selectedAccountId}
                 onSelectAccount={setSelectedAccountId}
-                onOpenCreateModal={() => setIsCreateAccountOpen(true)}
+                onOpenCreateModal={() => setCreateAccountForm({ defaultMakePrimary: false })}
                 onSetPrimary={(accountId) => setPrimaryAccount(accountId)}
               />
             </div>
@@ -117,7 +157,7 @@ const DashboardView: React.FC = () => {
 
         {/* Drawdown Risk Engine Gauge (Rendered when a prop account is selected) */}
         {selectedAccount && (
-          <DrawdownGauge account={selectedAccount} />
+          <DrawdownGauge account={selectedAccount} hasSuccessor={hasSuccessor} onAction={handleAccountAction} />
         )}
 
         {/* Backfill banner: only meaningful once a primary account exists to
@@ -192,13 +232,26 @@ const DashboardView: React.FC = () => {
           defaultAccountId={selectedAccountId}
         />
 
-        <CreateAccountModal
-          isOpen={isCreateAccountOpen}
-          onClose={() => setIsCreateAccountOpen(false)}
-          onSubmit={async (payload) => {
-            await createAccount(payload);
-          }}
-        />
+        {createAccountForm && (
+          <CreateAccountModal
+            isOpen
+            onClose={() => setCreateAccountForm(null)}
+            prefill={createAccountForm.prefill}
+            defaultMakePrimary={createAccountForm.defaultMakePrimary}
+            onSubmit={async (payload, makePrimary) => {
+              const created = await createAccount(payload);
+              if (makePrimary) {
+                // The account already exists at this point. If only this follow-up fails, don't report the
+                // whole form as failed: resubmitting would create a duplicate. "☆ Set Primary" still works.
+                try {
+                  await setPrimaryAccount(created.id);
+                } catch {
+                  /* non-critical, see above */
+                }
+              }
+            }}
+          />
+        )}
 
       </main>
     </div>

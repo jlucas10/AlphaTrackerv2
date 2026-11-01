@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../api/apiClient";
-import type{ Account, BackfillResult, CreateAccountPayload } from "../types/Account"
+import type{ Account, AccountStatus, BackfillResult, CreateAccountPayload } from "../types/Account"
 
 export const useAccount = () => {
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -61,6 +61,16 @@ export const useAccount = () => {
         return updated;
     };
 
+    // Marks an account passed / failed, or reopens it (ACTIVE). Only this one account changes on the
+    // server's side apart from primary: closing the primary un-sets it. The response is that account
+    // with isPrimary already false, so swapping it in keeps the local list in step without a refetch.
+    const updateAccountStatus = async (accountId: number, status: AccountStatus): Promise<Account> => {
+        const response = await apiClient.patch<Account>(`/accounts/${accountId}/status`, { status });
+        const updated = response.data;
+        setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+        return updated;
+    };
+
     // Reassigns every unassigned trade onto the primary account. This is the
     // explicit, confirmed step — nothing calls it automatically, since it
     // rewrites historical trades' account and changes a live balance.
@@ -89,6 +99,7 @@ export const useAccount = () => {
         refetchAccounts: fetchAccounts,
         createAccount,
         setPrimaryAccount,
+        updateAccountStatus,
         unassignedTradeCount,
         refetchUnassignedTradeCount: fetchUnassignedTradeCount,
         backfillUnassignedTrades,

@@ -2,13 +2,18 @@ import React from 'react';
 import type { Account } from '../../types/Account';
 import { describeAccountOutcome } from '../../utils/accountOutcome';
 import { formatMoney } from '../../utils/formatters';
+import type { AccountAction } from '../../utils/accountActions';
+import { AccountActions } from './AccountActions';
 import { AccountStatusChip } from './AccountStatusChip';
 
 interface DrawdownGaugeProps {
   account: Account | null;
+  // Both optional so the gauge still renders read-only anywhere that doesn't wire up the lifecycle buttons.
+  hasSuccessor?: boolean;
+  onAction?: (action: AccountAction) => Promise<void>;
 }
 
-export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
+export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account, hasSuccessor = false, onAction }) => {
   if (!account) {
     return (
       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 text-gray-400 text-xs font-semibold flex items-center justify-between">
@@ -141,6 +146,8 @@ export const DrawdownGauge: React.FC<DrawdownGaugeProps> = ({ account }) => {
           />
         </div>
       </div>
+
+      {onAction && <AccountActions account={account} hasSuccessor={hasSuccessor} onAction={onAction} />}
     </div>
   );
 };
