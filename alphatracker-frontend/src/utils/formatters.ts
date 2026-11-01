@@ -10,6 +10,13 @@ export function initialOf(name: string | null | undefined): string {
   return first ? first.toUpperCase() : '?';
 }
 
+// A plain dollar amount for "x of y" displays: "$2,140", "$3,000.50", "-$500". No plus sign and no
+// forced cents, unlike formatUsd below, which is for a signed P&L figure.
+export function formatMoney(value: number): string {
+  const digits = Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${value < 0 ? '-' : ''}$${digits}`;
+}
+
 // Signed dollar amount, e.g. "+$68.16" / "-$412.50". Exactly 0 is "$0.00" with
 // no sign: a neutral result is neither a gain nor a loss.
 export function formatUsd(value: number): string {
