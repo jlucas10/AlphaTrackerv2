@@ -559,9 +559,9 @@ saves (so a mistaken "passed" never locks anyone out).
 - [x] 3. **UI: target progress bar, banners, PASSED/FAILED chips.**
 - [x] 4. **Pass flow.**
 - [x] 5. **Trade entry warnings**
-- [ ] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the
+- [x] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the
      server's number (the model can't subtract); optionally seed a target in the eval data.
-- [ ] 7. Verify with demo data that really hits a target; update README and CONTEXT.
+- [x] 7. Verify with demo data that really hits a target; update README and CONTEXT.
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
