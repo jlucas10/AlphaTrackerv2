@@ -183,11 +183,18 @@ public class AccountServiceTest {
     @Test
     @DisplayName("A wrong trailing lock on an existing account can be repaired (or cleared); a bad value or someone else's account is refused")
     void testRepairingTheTrailingLock() {
-        // The account as the bug left it: a $2,000 "lock" pinned the floor at $2,000.
+        // The account as the bug left it: a $2,000 "lock" that used to pin the floor at $2,000. It is now
+        // ignored, so the floor is the ordinary $48,000 even before anyone repairs the stored value.
         Account account = ownedAccount(Account.builder().id(31L).startingBalance(50000.0).maxDrawdown(2000.0)
                 .drawdownMode(DrawdownMode.END_OF_DAY).trailingStopsAtBalance(2000.0).build());
         history(account);
-        assertEquals(2000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);
+        assertEquals(48000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);
+
+        // The reported case: down $2,100 on a $50k / $2k account is $47,900, past the $48,000 floor = breached.
+        history(account, trade(-2100.0, jan(5, 10)));
+        assertEquals(48000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);
+        assertEquals(AccountStatus.FAILED, accountService.computeProgress(account).suggestedStatus());
+        history(account);
 
         assertThrows(IllegalArgumentException.class, () -> accountService.updateTrailingLock(31L, 2000.0, mockUser));
         assertEquals(2000.0, account.getTrailingStopsAtBalance());   // refused: unchanged

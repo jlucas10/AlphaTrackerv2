@@ -154,11 +154,16 @@ public class AccountService {
 
     // See CONTEXT.md "Drawdown Rules (Resolved)": the floor trails the high-water mark by maxDrawdown,
     // and stops rising once it reaches trailingStopsAtBalance (when one is set).
+    //
+    // A lock below the STARTING floor (start - maxDrawdown) is nonsense, usually the drawdown amount typed into
+    // the balance field. Honouring it would drag the floor down to it (2000 on a 50k account) and the account
+    // could never fail, so it is ignored here and the floor trails normally. New values like that are refused
+    // on the way in (requireSensibleTrailingLock); this covers accounts saved before that check existed.
     private double floorFor(Account account, double highWaterMark) {
         double rawFloor = highWaterMark - account.getMaxDrawdown();
-        return account.getTrailingStopsAtBalance() != null
-                ? Math.min(rawFloor, account.getTrailingStopsAtBalance())
-                : rawFloor;
+        Double lock = account.getTrailingStopsAtBalance();
+        boolean usable = lock != null && lock >= account.getStartingBalance() - account.getMaxDrawdown();
+        return usable ? Math.min(rawFloor, lock) : rawFloor;
     }
 
     // One place that turns an account into its response, so every endpoint reports the same facts.
