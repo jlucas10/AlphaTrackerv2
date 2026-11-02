@@ -561,7 +561,6 @@ saves (so a mistaken "passed" never locks anyone out).
 - [x] 5. **Trade entry warnings**
 - [x] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the
      server's number (the model can't subtract); optionally seed a target in the eval data.
-- [x] 7. Verify with demo data that really hits a target; update README and CONTEXT.
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
