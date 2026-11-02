@@ -46,6 +46,16 @@ public class AccountController {
         return ResponseEntity.ok(accountService.updateStatus(id, request.getStatus(), user));
     }
 
+    // Set or clear the balance where the drawdown floor stops rising. Ownership and the "not below the
+    // starting floor" rule are enforced in the service.
+    @PatchMapping("/{id}/trailing-lock")
+    public ResponseEntity<AccountResponse> updateTrailingLock(
+            @PathVariable Long id,
+            @RequestBody TrailingLockRequest request,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(accountService.updateTrailingLock(id, request.getTrailingStopsAtBalance(), user));
+    }
+
     // Preview endpoint the frontend calls before showing the backfill confirm
     // step, so the trader sees how many trades would move before committing.
     @GetMapping("/unassigned-trades/count")

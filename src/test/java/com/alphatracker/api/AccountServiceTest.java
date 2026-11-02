@@ -136,6 +136,71 @@ public class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("Topstep-style $50k / $2k account locked at $50,000: floor rises with profit, never drops on a loss, stops at the lock")
+    void testFloorRisesNeverFallsAndStopsAtTheLock() {
+        Account account = Account.builder()
+                .id(30L)
+                .startingBalance(50000.0)
+                .maxDrawdown(2000.0)
+                .drawdownMode(DrawdownMode.END_OF_DAY)
+                .trailingStopsAtBalance(50000.0)
+                .build();
+        Trade day1 = trade(1000.0, jan(5, 10));    // closes 51,000
+        Trade day2 = trade(-600.0, jan(6, 10));    // closes 50,400
+        Trade day3 = trade(1900.0, jan(7, 10));    // closes 52,300
+        Trade day4 = trade(-1500.0, jan(8, 10));   // closes 50,800
+
+        history(account, day1);
+        assertEquals(49000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);  // 51,000 - 2,000
+
+        history(account, day1, day2);
+        assertEquals(49000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);  // the loss does not lower it
+
+        history(account, day1, day2, day3);
+        assertEquals(50000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);  // 52,300 - 2,000 = 50,300, held at the lock
+
+        history(account, day1, day2, day3, day4);
+        assertEquals(50000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);  // and it stays there
+    }
+
+    @Test
+    @DisplayName("A trailing lock below the starting floor (the drawdown amount typed by mistake) is refused; the starting balance and the starting floor are fine")
+    void testTrailingLockBelowTheStartingFloorIsRefused() {
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tradeRepository.findAllByAccountIdOrderByTradeDateAsc(any())).thenReturn(List.of());
+        AccountRequest.AccountRequestBuilder base = AccountRequest.builder()
+                .name("Topstep 50k").firm("Topstep").startingBalance(50000.0).maxDrawdown(2000.0);
+
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                () -> accountService.createAccount(base.trailingStopsAtBalance(2000.0).build(), mockUser));
+        assertTrue(refused.getMessage().contains("not the drawdown amount"));
+        verify(accountRepository, never()).save(any());
+
+        assertEquals(48000.0, accountService.createAccount(base.trailingStopsAtBalance(50000.0).build(), mockUser).getDrawdownFloor(), 0.001);
+        assertEquals(48000.0, accountService.createAccount(base.trailingStopsAtBalance(48000.0).build(), mockUser).getDrawdownFloor(), 0.001);
+    }
+
+    @Test
+    @DisplayName("A wrong trailing lock on an existing account can be repaired (or cleared); a bad value or someone else's account is refused")
+    void testRepairingTheTrailingLock() {
+        // The account as the bug left it: a $2,000 "lock" pinned the floor at $2,000.
+        Account account = ownedAccount(Account.builder().id(31L).startingBalance(50000.0).maxDrawdown(2000.0)
+                .drawdownMode(DrawdownMode.END_OF_DAY).trailingStopsAtBalance(2000.0).build());
+        history(account);
+        assertEquals(2000.0, accountService.computeDrawdownSnapshot(account).drawdownFloor(), 0.001);
+
+        assertThrows(IllegalArgumentException.class, () -> accountService.updateTrailingLock(31L, 2000.0, mockUser));
+        assertEquals(2000.0, account.getTrailingStopsAtBalance());   // refused: unchanged
+
+        assertEquals(48000.0, accountService.updateTrailingLock(31L, 50000.0, mockUser).getDrawdownFloor(), 0.001);
+        assertEquals(50000.0, account.getTrailingStopsAtBalance());
+        assertNull(accountService.updateTrailingLock(31L, null, mockUser).getTrailingStopsAtBalance());
+
+        when(accountRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> accountService.updateTrailingLock(99L, 50000.0, mockUser));
+    }
+
+    @Test
     @DisplayName("createAccount makes a trader's very first account primary automatically")
     void testCreateAccountFirstAccountIsPrimary() {
         AccountRequest request = AccountRequest.builder()

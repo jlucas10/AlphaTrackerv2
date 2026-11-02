@@ -196,15 +196,28 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-neutral-400 mb-1">Trailing Lock ($)</label>
+              <label className="block text-xs font-mono text-neutral-400 mb-1">Floor Stops Rising At ($)</label>
               <input
                 type="number"
                 step="any"
-                placeholder="Optional"
+                placeholder="Optional, e.g. 50000"
                 value={trailingStopsAtBalance}
                 onChange={(e) => setTrailingStopsAtBalance(e.target.value)}
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-200 font-mono focus:outline-hidden focus:border-emerald-500"
               />
+              {/* This field takes a BALANCE, not the drawdown amount: typing 2000 here pins the floor at $2,000
+                  and the account could never fail. The server refuses that, but the form should say it first. */}
+              <p className="mt-1 text-[10px] font-mono text-neutral-500 leading-snug">
+                A balance, not the drawdown. The floor trails your profit up to this balance, then stays put (Topstep:
+                your starting balance).{' '}
+                <button
+                  type="button"
+                  onClick={() => setTrailingStopsAtBalance(startingBalance)}
+                  className="text-emerald-400 hover:text-emerald-300 underline"
+                >
+                  Use starting balance
+                </button>
+              </p>
             </div>
           </div>
 

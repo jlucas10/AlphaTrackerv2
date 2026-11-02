@@ -193,6 +193,8 @@ public class AccountService {
         if (request.getTrailingStopsAtBalance() != null && request.getTrailingStopsAtBalance() <= 0) {
             throw new IllegalArgumentException("Trailing stop balance must be greater than 0.");
         }
+        requireSensibleTrailingLock(
+                request.getTrailingStopsAtBalance(), request.getStartingBalance(), request.getMaxDrawdown());
 
         // Lineage: a funded account created after passing an evaluation can record which one it came from.
         // Checked now so the stored id is always a real evaluation that belongs to this trader.
@@ -232,6 +234,38 @@ public class AccountService {
 
         Account saved = accountRepository.save(account);
         return toResponse(saved);
+    }
+
+    // The trailing lock is a BALANCE, not a dollar amount: the floor climbs with the high-water mark until
+    // it reaches this balance, then stops (Topstep: the starting balance, so a $50k account with $2k drawdown
+    // trails from $48,000 up to $50,000 and no further). Typing the drawdown amount ($2,000) here instead
+    // would pin the floor at $2,000, far below the account, so the account could never fail. Any lock below
+    // the STARTING floor is that kind of mistake and is refused. A lock equal to the starting floor is
+    // allowed: it simply means a floor that never trails.
+    private void requireSensibleTrailingLock(Double lock, double startingBalance, double maxDrawdown) {
+        double startingFloor = startingBalance - maxDrawdown;
+        if (lock != null && lock < startingFloor) {
+            throw new IllegalArgumentException(String.format(
+                    "Trailing lock is the balance where the drawdown floor stops rising (for example your starting "
+                            + "balance, $%,.2f), not the drawdown amount. It can't be below the starting floor of $%,.2f. "
+                            + "Leave it empty if your floor never stops trailing.",
+                    startingBalance, startingFloor));
+        }
+    }
+
+    // Sets or clears the trailing lock on an existing account, so a wrong value can be repaired (there is no
+    // other way to edit an account). Only this one field changes; the floor itself is never stored, it is
+    // recomputed from the trades on the next read.
+    @Transactional
+    public AccountResponse updateTrailingLock(Long accountId, Double lock, User user) {
+        Account account = accountRepository.findByIdAndUserId(accountId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Account not found or does not belong to user."));
+        if (lock != null && lock <= 0) {
+            throw new IllegalArgumentException("Trailing stop balance must be greater than 0.");
+        }
+        requireSensibleTrailingLock(lock, account.getStartingBalance(), account.getMaxDrawdown());
+        account.setTrailingStopsAtBalance(lock);
+        return toResponse(accountRepository.save(account));
     }
 
     // Marks an account PASSED, FAILED, or back to ACTIVE. The replay only SUGGESTS a status (it can see a
