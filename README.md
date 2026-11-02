@@ -39,7 +39,14 @@ ticker, direction, entry, exit, size. Every dollar figure (P/L, drawdown floor) 
 - **Trailing drawdown engine** — replays an account's trade history to compute its
   high-water mark and live drawdown floor, supporting both `END_OF_DAY` and
   `PER_TRADE_CLOSE` trailing modes, plus an optional balance where the floor locks in
-  and stops trailing.
+  and stops trailing (a Topstep-style $50k / $2k account trails from $48,000 up to
+  $50,000, then stays put; it never drops after a loss).
+- **Account lifecycle** — the same replay that finds the floor also reports profit-target
+  progress and the first day the floor was hit. The app _suggests_ passed or failed
+  (whichever happened first, so an account that blew up and then climbed past its target
+  is a failure); the trader confirms, because firms add rules the app can't see. Marking
+  an evaluation passed opens a prefilled funded-account setup linked back to it, and
+  logging a trade on a closed account warns without blocking.
 - **Calendar P/L matrix & equity curve** — a month-at-a-glance calendar colored by
   daily P/L, with a day drill-down showing that day's executions, win rate, and
   discipline stats.
@@ -216,7 +223,7 @@ through `VITE_ASSISTANT_API_URL` (include the `https://`).
 ## Running the tests
 
 ```bash
-# Backend — 65 tests across repository (@DataJpaTest), service (Mockito), and
+# Backend — 85 tests across repository (@DataJpaTest), service (Mockito), and
 # controller (@WebMvcTest) layers
 ./mvnw test
 
@@ -225,7 +232,7 @@ cd alphatracker-frontend
 npm run build
 npm run lint
 
-# Assistant — 45 pytest tests: the tool loop, the number check, the rate limiter, CORS,
+# Assistant — 46 pytest tests: the tool loop, the number check, the rate limiter, CORS,
 # the Gemini adapter, and the eval harness's own scorer. No model or network needed.
 cd alphatracker-assistant
 pytest
@@ -255,6 +262,7 @@ At a glance:
 
 - ✅ Core trade logging, calendar visualization, JWT auth
 - ✅ Multi-account prop firm management + trailing drawdown engine
+- ✅ Account lifecycle: profit-target progress, breach detection, passed / failed, funded successor
 - ✅ Day-scoped journal: notes, HTF bias, chart screenshots, per-trade ratings/tags
 - ✅ Deployed to production: Vercel + Railway + Neon + AWS S3 (see the note below)
 - ✅ Analytics API and an AI trade review assistant: chat panel, eval set with an

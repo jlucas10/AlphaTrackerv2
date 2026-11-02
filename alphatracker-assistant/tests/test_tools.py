@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 
+from app.grounding import KnownNumbers
 from app.spring_client import ALLOWED_PATHS, SpringAuthError, SpringToolError
 from app.tools import MAX_PAYLOAD_CHARS, TOOLS, ToolRunner
 
@@ -37,6 +38,32 @@ def test_period_is_resolved_in_python_and_mapped_onto_springs_query():
 
     # Every tool must point at a path the Spring client will actually allow.
     assert {t.path for t in TOOLS.values()} <= ALLOWED_PATHS
+
+
+def test_list_accounts_adds_a_percent_the_grounding_check_will_accept():
+    accounts = [
+        {"id": 1, "name": "Near", "targetProgress": 0.7133, "targetRemaining": 860.0},
+        {"id": 2, "name": "Past", "targetProgress": 1.0333, "targetRemaining": 0.0},
+        {"id": 3, "name": "Behind", "targetProgress": -0.7, "targetRemaining": 5100.0},
+        {"id": 4, "name": "Funded, no target", "targetProgress": None, "targetRemaining": None},
+    ]
+    spring = FakeSpring(response=accounts)
+
+    data = runner(spring).run("list_accounts", {}, "tok").payload["data"]
+
+    assert [a.get("targetProgressPercent") for a in data] == [71.3, 103.3, -70.0, None]
+    assert "targetProgressPercent" not in data[3]            # null stays "no data": no invented 0%
+    assert accounts[0].keys() == {"id", "name", "targetProgress", "targetRemaining"}   # the input is not mutated
+
+    # The reason it exists: 103.3% (past the target) is not a number the check would otherwise know,
+    # because it only derives a percent from values up to 1.
+    known = KnownNumbers()
+    known.add_payload(data)
+    assert known.unknown_in("Past is at 103.3% of target with $0 left. Near has $860 left (71.3%).") == []
+
+    only_ratio = KnownNumbers()
+    only_ratio.add_payload(accounts)
+    assert only_ratio.unknown_in("Past is at 103.3% of target.") == [103.3]
 
 
 def test_bad_calls_return_an_error_the_model_can_read_and_never_reach_spring():

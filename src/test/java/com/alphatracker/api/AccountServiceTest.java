@@ -305,6 +305,7 @@ public class AccountServiceTest {
         AccountProgress partway = accountService.computeProgress(account);
         assertEquals(2140.0, partway.profit(), 0.001);
         assertEquals(0.7133, partway.targetProgress(), 0.00001);
+        assertEquals(860.0, partway.targetRemaining(), 0.001);   // 3000 - 2140
         assertNull(partway.targetReachedOn());
         assertNull(partway.suggestedStatus());
 
@@ -312,6 +313,7 @@ public class AccountServiceTest {
         AccountProgress reached = accountService.computeProgress(account);
         assertEquals(janDay(7), reached.targetReachedOn());   // the trade that took profit from 2140 to 3040
         assertEquals(1.0133, reached.targetProgress(), 0.00001); // can exceed 1: 3040 / 3000
+        assertEquals(0.0, reached.targetRemaining(), 0.001);     // past the target: nothing left, never -40
         assertEquals(AccountStatus.PASSED, reached.suggestedStatus());
     }
 
@@ -388,6 +390,7 @@ public class AccountServiceTest {
             Account evalWithoutTarget = evaluation(DrawdownMode.PER_TRADE_CLOSE, noTarget);
             history(evalWithoutTarget, trade(3500.0, jan(5, 10)));
             assertNull(accountService.computeProgress(evalWithoutTarget).targetProgress());
+            assertNull(accountService.computeProgress(evalWithoutTarget).targetRemaining());
             assertNull(accountService.computeProgress(evalWithoutTarget).suggestedStatus());
         }
     }

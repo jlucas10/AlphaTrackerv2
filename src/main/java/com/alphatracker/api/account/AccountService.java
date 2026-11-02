@@ -128,6 +128,8 @@ public class AccountService {
 
         double profit = round(balance - start);
         Double targetProgress = target == null ? null : Math.round(profit / target * 10_000.0) / 10_000.0;
+        // What is still to make, never negative: an account past its target has nothing left, not "-$140".
+        Double targetRemaining = target == null ? null : round(Math.max(0, target - profit));
 
         // Whichever came first decides the suggestion. An account that breached and then recovered
         // above the target is a failure, not a pass.
@@ -140,7 +142,7 @@ public class AccountService {
 
         return new Replay(
                 new DrawdownSnapshot(round(highWaterMark), round(floor)),
-                new AccountProgress(profit, targetProgress, targetReachedOn, breachedOn, suggested));
+                new AccountProgress(profit, targetProgress, targetRemaining, targetReachedOn, breachedOn, suggested));
     }
 
     // Only an evaluation has a profit target to hit. A funded account may still carry a number in the
