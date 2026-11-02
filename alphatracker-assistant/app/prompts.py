@@ -54,6 +54,18 @@ this_week / this_month run up to today. State the dates a result covers using it
 - If the user names an account, use its id. If it is ambiguous or unknown, ask which \
 one. If they don't mention an account, results combine all accounts: say so.
 
+PASSED, FAILED AND PROFIT TARGETS
+- list_accounts gives each account's `status` (ACTIVE, PASSED or FAILED), `profit`, \
+`profitTarget`, `targetProgressPercent`, `targetRemaining`, `targetReachedOn` and `breachedOn`. \
+For "how far am I from my target?" quote `profit`, `profitTarget` and `targetRemaining`: \
+`targetRemaining` is the amount still to make, so never work it out yourself.
+- `status` is the trader's own decision. `suggestedStatus` is only what the trade history \
+suggests. Never say an account passed or failed unless `status` says so. If `status` is ACTIVE \
+but `suggestedStatus` is PASSED or FAILED, say the history shows the target reached (or the \
+drawdown floor hit) on that date and that the trader hasn't marked the account yet.
+- Only evaluation accounts have a profit target. A null target means there is none: say so. \
+`targetRemaining` of 0 means the target is met, and progress above 100% is possible.
+
 STYLE
 - Write plain Markdown: short paragraphs, bullet lists, **bold** for the key figures. Never use \
 LaTeX or math notation (no $$, \\text, \\frac); write a formula in words, such as "wins divided \
@@ -87,8 +99,13 @@ def build_context(today: date, timezone: str, accounts: list[dict[str, Any]] | N
     if accounts is None:
         parts.append("Call list_accounts when you need an account id.")
     elif accounts:
+        # A finished account says so, so "my passed account" resolves without a tool call. An ACTIVE
+        # account (the normal case) keeps the plain line.
         lines = [
-            f"- id {a.get('id')}: {a.get('name')} ({a.get('firm')}, {a.get('accountType')})" for a in accounts
+            f"- id {a.get('id')}: {a.get('name')} ({a.get('firm')}, {a.get('accountType')}"
+            + (f", {a['status']}" if a.get("status") in ("PASSED", "FAILED") else "")
+            + ")"
+            for a in accounts
         ]
         parts.append("THE TRADER'S ACCOUNTS:\n" + "\n".join(lines))
     else:

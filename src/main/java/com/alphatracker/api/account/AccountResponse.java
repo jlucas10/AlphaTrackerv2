@@ -29,6 +29,7 @@ public class AccountResponse {
     // (AccountService.replay). Derived on every read, never stored.
     private Double profit;
     private Double targetProgress;
+    private Double targetRemaining;
     private LocalDate targetReachedOn;
     private LocalDate breachedOn;
     private AccountStatus suggestedStatus;
@@ -59,6 +60,7 @@ public class AccountResponse {
                 .drawdownFloor(snapshot.drawdownFloor())
                 .profit(progress.profit())
                 .targetProgress(progress.targetProgress())
+                .targetRemaining(progress.targetRemaining())
                 .targetReachedOn(progress.targetReachedOn())
                 .breachedOn(progress.breachedOn())
                 .suggestedStatus(progress.suggestedStatus())

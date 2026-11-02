@@ -89,7 +89,12 @@ TOOLS: dict[str, Tool] = {
         Tool(
             name="list_accounts",
             description=(
-                "List the trader's prop accounts with their ids, names, firms, balances and drawdown figures. "
+                "List the trader's prop accounts with their ids, names, firms, balances and drawdown figures, "
+                "plus each account's lifecycle: `status` (ACTIVE / PASSED / FAILED, the trader's own call), "
+                "`profit` since the starting balance, and for evaluation accounts the `profitTarget`, "
+                "`targetProgressPercent`, `targetRemaining` (dollars still to make; 0 once met), `targetReachedOn`, "
+                "and `breachedOn` (the first day the drawdown floor was hit). `suggestedStatus` is only what the "
+                "history suggests, not a decision. "
                 "Call this first when the user names an account (e.g. 'my Apex account') to find its id."
             ),
             args_model=NoArgs,
@@ -190,6 +195,8 @@ class ToolRunner:
         except SpringToolError as exc:
             return _error(exc.message)
 
+        if tool.path == "/accounts":
+            data = _with_progress_percent(data)
         payload: dict[str, Any] = {"data": data}
         if tool.path == "/journal":
             payload = _fit_journal(data)
@@ -203,6 +210,25 @@ class ToolRunner:
         if args.from_date or args.to_date:
             return args.from_date, args.to_date
         return resolve_period("all_time", self._today())
+
+
+def _with_progress_percent(accounts: Any) -> Any:
+    """Add `targetProgressPercent` (the server's ratio x 100, one decimal) to each account.
+
+    Spring sends targetProgress as a ratio (1.0333 = 103.3% of target). The grounding check only accepts
+    the percent form of a value up to 1, so an account past its target would have its honest "103.3%"
+    rejected as an invented number. Handing the model the percent as a figure a tool returned fixes that,
+    and it never has to multiply. Presentation only: the underlying number is still Spring's.
+    """
+    if not isinstance(accounts, list):
+        return accounts
+    enriched = []
+    for account in accounts:
+        progress = account.get("targetProgress") if isinstance(account, dict) else None
+        if isinstance(progress, (int, float)) and not isinstance(progress, bool):
+            account = {**account, "targetProgressPercent": round(progress * 100, 1)}
+        enriched.append(account)
+    return enriched
 
 
 def _window_problem(tool: Tool, frm: date | None, to: date | None) -> str | None:

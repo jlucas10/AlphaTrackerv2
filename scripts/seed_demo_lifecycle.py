@@ -122,8 +122,10 @@ def main() -> None:
     print(f"Seeded {EMAIL} / {PASSWORD} at {base}\n")
     for a in call("GET", "/accounts", token=token):
         target = f"{a['targetProgress'] * 100:.0f}%" if a.get("targetProgress") is not None else "-"
+        left = a.get("targetRemaining")  # absent on a backend that predates the field
+        left = "n/a" if "targetRemaining" not in a else "-" if left is None else f"{left:.2f}"
         print(f"  {a['name']:<32} {a['accountType']:<10} status={a['status']:<7} profit={a['profit']:>8.2f} "
-              f"target={target:>5} suggested={a['suggestedStatus']}")
+              f"target={target:>5} left={left:>8} suggested={a['suggestedStatus']}")
 
 
 if __name__ == "__main__":
