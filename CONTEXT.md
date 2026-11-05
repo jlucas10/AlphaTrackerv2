@@ -562,6 +562,28 @@ saves (so a mistaken "passed" never locks anyone out).
 - [x] 6. Assistant: describe the new `list_accounts` fields so "how far am I from my target?" is answered from the
      server's number (the model can't subtract); optionally seed a target in the eval data.
 
+### Sprint 4.7 — TopstepX CSV trade import — PLANNING (design awaiting owner approval)
+
+**Goal:** a trader uploads a TopstepX export, previews the trades that will be created, confirms, and they land in
+the chosen prop account exactly as if logged by hand. Re-uploading the same file creates no duplicates.
+
+**Decided (owner):** new `importer` package; `TradeImportParser` interface with one adapter (`TopStepXParser`)
+selected by a `source` field (same pattern as the `StorageService` adapters); no Tradovate code now. Money math
+stays in ONE path (`Instrument` + `TradeService` derivation) — no second P&L path. Two steps: `POST
+/api/v1/imports/preview` (writes nothing) and `POST /api/v1/imports/confirm` (one transaction). Duplicates caught by
+`source` + `externalId` with a per-user unique constraint. Unknown instruments rejected per row, never defaulted.
+
+**Open questions (answer before step 1):** commissions/fees (the sample has `Fees` and `Commissions`; there is no
+`roundTurnFee` in the code, it was removed in `eb3e212`); which timestamp decides the trading day; the user's time
+zone; `followedPlan` for imported trades (manual logging defaults it to `true`).
+
+**Steps (stop after each for review):**
+
+- [ ] 1. Normalized model + `TopStepXParser` + parser tests (real sample as fixture + hand-made edge cases)
+- [ ] 2. `POST /api/v1/imports/preview` (+ controller tests incl. 400/403)
+- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch
+- [ ] 4. Frontend "Import trades" modal (source, account, upload, preview table, confirm, summary)
+
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
 Raised while reviewing Sprint 3.5: the sidebar's "Accounts" button currently just pops `CreateAccountModal` directly — there's no page to browse, manage, or retire accounts. Requirements as discussed:
