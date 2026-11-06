@@ -573,16 +573,34 @@ stays in ONE path (`Instrument` + `TradeService` derivation) — no second P&L p
 /api/v1/imports/preview` (writes nothing) and `POST /api/v1/imports/confirm` (one transaction). Duplicates caught by
 `source` + `externalId` with a per-user unique constraint. Unknown instruments rejected per row, never defaulted.
 
-**Open questions (answer before step 1):** commissions/fees (the sample has `Fees` and `Commissions`; there is no
-`roundTurnFee` in the code, it was removed in `eb3e212`); which timestamp decides the trading day; the user's time
-zone; `followedPlan` for imported trades (manual logging defaults it to `true`).
+**Answered (owner):**
+
+- **Fees/commissions: ignored.** Not stored, not shown. The export's `PnL` is gross and equals our formula on all 21
+  sample rows, so it is read only as a cross-check (a mismatch becomes a preview warning).
+- **`tradeDate` = `EnteredAt`** (the day the trade was opened), converted by instant into **`America/Los_Angeles`**
+  (`ImportRules.JOURNAL_ZONE`). `ExitedAt` never moves a trade to another day.
+- **`followedPlan` is chosen by the trader, never defaulted to `true`** (manual logging defaults to `true`; imports
+  must not). Preview rows carry a per-row yes/no, with a "set all" shortcut; unanswered stays `null` (= unspecified).
+- **Split exits are separate trades** (TopstepX reports one row per piece, each with its own `Id`).
+- **Same file into several accounts is allowed** (copy-trading). The trader picks one or MORE accounts in the modal;
+  duplicates are judged **per account**, so the unique key is `(account_id, source, external_id)`, not per user.
+  `confirm` therefore takes `accountIds[]`, and the preview reports duplicates per row per account.
+- More samples: owner will export an Asia-session file (new instruments / times to test against).
+
+**Step 1 findings (from the real sample, not the docs):** UTF-8 **BOM + CRLF** (the BOM makes the first header read
+`\uFEFFId`); rows are completed trades, not fills, so **no pairing/FIFO rule is needed**; `Id` is unique so no
+fingerprint is needed for this source; timestamps carry their own offset (`-07:00`), `TradeDay` is Chicago time and is
+ignored. Known limit: `LocalDateTime` cannot represent the repeated 01:30 hour at the November DST change, so two trades
+in that hour can show the same stored time (ordering by `id` as a tie-break is added in step 3).
 
 **Steps (stop after each for review):**
 
-- [ ] 1. Normalized model + `TopStepXParser` + parser tests (real sample as fixture + hand-made edge cases)
+- [x] 1. Normalized model + `TopStepXParser` + parser tests (`importer/` package; 26 tests: real sample + hand-made
+     edge cases incl. midnight and DST; hand-written CSV reader, no new dependency; suite at 109)
 - [ ] 2. `POST /api/v1/imports/preview` (+ controller tests incl. 400/403)
-- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch
-- [ ] 4. Frontend "Import trades" modal (source, account, upload, preview table, confirm, summary)
+- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch;
+     add `id asc` tie-break to `findAllByAccountIdOrderByTradeDateAsc`
+- [ ] 4. Frontend "Import trades" modal (source, account(s), upload, preview table with follow-plan choice, confirm, summary)
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 
