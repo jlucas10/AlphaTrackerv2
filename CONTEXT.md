@@ -567,37 +567,19 @@ saves (so a mistaken "passed" never locks anyone out).
 **Goal:** a trader uploads a TopstepX export, previews the trades that will be created, confirms, and they land in
 the chosen prop account exactly as if logged by hand. Re-uploading the same file creates no duplicates.
 
-**Decided (owner):** new `importer` package; `TradeImportParser` interface with one adapter (`TopStepXParser`)
-selected by a `source` field (same pattern as the `StorageService` adapters); no Tradovate code now. Money math
-stays in ONE path (`Instrument` + `TradeService` derivation) — no second P&L path. Two steps: `POST
-/api/v1/imports/preview` (writes nothing) and `POST /api/v1/imports/confirm` (one transaction). Duplicates caught by
-`source` + `externalId` with a per-user unique constraint. Unknown instruments rejected per row, never defaulted.
-
-**Answered (owner):**
-
-- **Fees/commissions: ignored.** Not stored, not shown. The export's `PnL` is gross and equals our formula on all 21
-  sample rows, so it is read only as a cross-check (a mismatch becomes a preview warning).
-- **`tradeDate` = `EnteredAt`** (the day the trade was opened), converted by instant into **`America/Los_Angeles`**
-  (`ImportRules.JOURNAL_ZONE`). `ExitedAt` never moves a trade to another day.
-- **`followedPlan` is chosen by the trader, never defaulted to `true`** (manual logging defaults to `true`; imports
-  must not). Preview rows carry a per-row yes/no, with a "set all" shortcut; unanswered stays `null` (= unspecified).
-- **Split exits are separate trades** (TopstepX reports one row per piece, each with its own `Id`).
-- **Same file into several accounts is allowed** (copy-trading). The trader picks one or MORE accounts in the modal;
-  duplicates are judged **per account**, so the unique key is `(account_id, source, external_id)`, not per user.
-  `confirm` therefore takes `accountIds[]`, and the preview reports duplicates per row per account.
-- More samples: owner will export an Asia-session file (new instruments / times to test against).
-
-**Step 1 findings (from the real sample, not the docs):** UTF-8 **BOM + CRLF** (the BOM makes the first header read
-`\uFEFFId`); rows are completed trades, not fills, so **no pairing/FIFO rule is needed**; `Id` is unique so no
-fingerprint is needed for this source; timestamps carry their own offset (`-07:00`), `TradeDay` is Chicago time and is
-ignored. Known limit: `LocalDateTime` cannot represent the repeated 01:30 hour at the November DST change, so two trades
-in that hour can show the same stored time (ordering by `id` as a tie-break is added in step 3).
-
 **Steps (stop after each for review):**
 
 - [x] 1. Normalized model + `TopStepXParser` + parser tests (`importer/` package; 26 tests: real sample + hand-made
      edge cases incl. midnight and DST; hand-written CSV reader, no new dependency; suite at 109)
-- [ ] 2. `POST /api/v1/imports/preview` (+ controller tests incl. 400/403)
+- [x] 2. `POST /api/v1/imports/preview` (multipart `file` + `source` + `accountIds`; read-only; 24 new tests, suite at 133).
+     Per row and per chosen account it reports NEW or DUPLICATE; bad rows come back as ERROR rows with line + message;
+     a file P&L that disagrees with ours is a warning (ours wins); a PASSED/FAILED account is flagged, not blocked.
+     Ownership is checked BEFORE the file is read (403, same answer for "not yours" and "doesn't exist").
+     P&L comes from `TradeService.derivePnl`, now the ONE formula used by manual logging and import.
+     `Trade` gained nullable `source` + `externalId` and the unique key `(account_id, source, external_id)`
+     (created by `ddl-auto: update`; hand-logged trades have NULLs, which Postgres treats as distinct).
+     _Checked live against local Postgres:_ 21 NEW / $495 total, 403 on another user's account, 400s for no file / bad
+     source / non-CSV, 403 with no token, and `GET /trades` stayed empty (nothing written).
 - [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch;
      add `id asc` tie-break to `findAllByAccountIdOrderByTradeDateAsc`
 - [ ] 4. Frontend "Import trades" modal (source, account(s), upload, preview table with follow-plan choice, confirm, summary)
