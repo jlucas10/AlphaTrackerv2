@@ -567,22 +567,22 @@ saves (so a mistaken "passed" never locks anyone out).
 **Goal:** a trader uploads a TopstepX export, previews the trades that will be created, confirms, and they land in
 the chosen prop account exactly as if logged by hand. Re-uploading the same file creates no duplicates.
 
-**Decided (owner):** new `importer` package; `TradeImportParser` interface with one adapter (`TopStepXParser`)
-selected by a `source` field (same pattern as the `StorageService` adapters); no Tradovate code now. Money math
-stays in ONE path (`Instrument` + `TradeService` derivation) — no second P&L path. Two steps: `POST
-/api/v1/imports/preview` (writes nothing) and `POST /api/v1/imports/confirm` (one transaction). Duplicates caught by
-`source` + `externalId` with a per-user unique constraint. Unknown instruments rejected per row, never defaulted.
-
-**Open questions (answer before step 1):** commissions/fees (the sample has `Fees` and `Commissions`; there is no
-`roundTurnFee` in the code, it was removed in `eb3e212`); which timestamp decides the trading day; the user's time
-zone; `followedPlan` for imported trades (manual logging defaults it to `true`).
-
 **Steps (stop after each for review):**
 
-- [ ] 1. Normalized model + `TopStepXParser` + parser tests (real sample as fixture + hand-made edge cases)
-- [ ] 2. `POST /api/v1/imports/preview` (+ controller tests incl. 400/403)
-- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch
-- [ ] 4. Frontend "Import trades" modal (source, account, upload, preview table, confirm, summary)
+- [x] 1. Normalized model + `TopStepXParser` + parser tests (`importer/` package; 26 tests: real sample + hand-made
+     edge cases incl. midnight and DST; hand-written CSV reader, no new dependency; suite at 109)
+- [x] 2. `POST /api/v1/imports/preview` (multipart `file` + `source` + `accountIds`; read-only; 24 new tests, suite at 133).
+     Per row and per chosen account it reports NEW or DUPLICATE; bad rows come back as ERROR rows with line + message;
+     a file P&L that disagrees with ours is a warning (ours wins); a PASSED/FAILED account is flagged, not blocked.
+     Ownership is checked BEFORE the file is read (403, same answer for "not yours" and "doesn't exist").
+     P&L comes from `TradeService.derivePnl`, now the ONE formula used by manual logging and import.
+     `Trade` gained nullable `source` + `externalId` and the unique key `(account_id, source, external_id)`
+     (created by `ddl-auto: update`; hand-logged trades have NULLs, which Postgres treats as distinct).
+     _Checked live against local Postgres:_ 21 NEW / $495 total, 403 on another user's account, 400s for no file / bad
+     source / non-CSV, 403 with no token, and `GET /trades` stayed empty (nothing written).
+- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch;
+     add `id asc` tie-break to `findAllByAccountIdOrderByTradeDateAsc`
+- [ ] 4. Frontend "Import trades" modal (source, account(s), upload, preview table with follow-plan choice, confirm, summary)
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)
 

@@ -2,6 +2,7 @@ package com.alphatracker.api;
 
 import com.alphatracker.api.account.Account;
 import com.alphatracker.api.account.AccountType;
+import com.alphatracker.api.importer.ImportSource;
 import com.alphatracker.api.trade.Trade;
 import com.alphatracker.api.trade.TradeRepository;
 import com.alphatracker.api.user.Role;
@@ -82,6 +83,56 @@ public class TradeRepositoryTest {
         assertEquals(1, scoped.size());
         assertEquals(10.0, scoped.get(0).getProfitLoss());
         assertTrue(asOther.isEmpty()); // someone else's accountId matches nothing
+    }
+
+    private Trade persistImported(User user, Account account, String externalId) {
+        Trade trade = Trade.builder().ticker("MNQ").direction("LONG").entryPrice(100.0).exitPrice(101.0)
+                .contracts(1).profitLoss(1.0).tradeDate(FROM).user(user).account(account)
+                .source(ImportSource.TOPSTEPX).externalId(externalId).setupTags(new ArrayList<>()).build();
+        entityManager.persist(trade);
+        return trade;
+    }
+
+    @Test
+    @DisplayName("findImportedExternalIds: returns only ids already imported into THAT account and source")
+    void findsImportedIdsPerAccount() {
+        Account a = persistAccount(owner);
+        Account b = persistAccount(owner);
+        persistImported(owner, a, "100");
+        persistImported(owner, a, "200");
+        persistImported(owner, b, "300");                  // other account - must not count for a
+        persistTrade(owner, a, FROM, 1.0);                 // hand-logged (null external id) - must not count
+        entityManager.flush();
+
+        List<String> found = tradeRepository.findImportedExternalIds(a.getId(), ImportSource.TOPSTEPX,
+                List.of("100", "300", "999"));
+
+        assertEquals(List.of("100"), found);
+    }
+
+    @Test
+    @DisplayName("the same broker trade can be imported into two accounts (copy-trading), but not twice into one")
+    void uniquePerAccount() {
+        Account a = persistAccount(owner);
+        Account b = persistAccount(owner);
+        persistImported(owner, a, "100");
+        persistImported(owner, b, "100");                  // same id, other account: allowed
+        entityManager.flush();
+
+        // Same id, same account: refused by the database. (IDENTITY ids make persist() insert immediately,
+        // so the violation surfaces here rather than at flush.)
+        assertThrows(Exception.class, () -> persistImported(owner, a, "100"));
+    }
+
+    @Test
+    @DisplayName("hand-logged trades (null source and external id) never collide with each other")
+    void manualTradesDoNotCollide() {
+        Account a = persistAccount(owner);
+        persistTrade(owner, a, FROM, 1.0);
+        persistTrade(owner, a, FROM, 1.0);
+        persistTrade(owner, a, FROM, 1.0);
+
+        assertDoesNotThrow(() -> entityManager.flush());
     }
 
     private Trade persistTrade(User user, Account account, LocalDateTime when, double pnl, String... tags) {

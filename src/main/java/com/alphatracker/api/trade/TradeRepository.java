@@ -1,9 +1,11 @@
 package com.alphatracker.api.trade;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import com.alphatracker.api.importer.ImportSource;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -72,4 +74,13 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
     List<Trade> findAllByUserIdAndAccountIsNull(Long userId);
 
     long countByUserIdAndAccountIsNull(Long userId);
+
+    // Which of these broker ids are already imported into this account. Backs duplicate detection in the
+    // import preview. Callers pass an account they have already proven the user owns.
+    @Query("""
+            select t.externalId from Trade t
+            where t.account.id = :accountId and t.source = :source and t.externalId in :externalIds
+            """)
+    List<String> findImportedExternalIds(@Param("accountId") Long accountId, @Param("source") ImportSource source,
+            @Param("externalIds") Collection<String> externalIds);
 }

@@ -36,15 +36,7 @@ public class TradeService {
         double exitPrice = requirePrice(request.getExitPrice(), "Exit price");
         int contracts = requireContracts(request.getContracts());
 
-        // A short profits when price falls, so the sign of the move flips.
-        double priceMove = "LONG".equals(direction)
-                ? exitPrice - entryPrice
-                : entryPrice - exitPrice;
-
-        double gross = priceMove * instrument.getPointValue() * contracts;
-        // No commission subtracted - see Instrument for why. A 50-point move
-        // on 5 MNQ contracts is exactly $500, the number a trader expects.
-        double netProfitLoss = round(gross);
+        double netProfitLoss = derivePnl(instrument, direction, entryPrice, exitPrice, contracts);
 
         // Sprint 2: Link to Account if accountId is passed
         Account targetAccount = null;
@@ -82,6 +74,19 @@ public class TradeService {
                 .build();
 
         return tradeRepository.save(trade);
+    }
+
+    // THE one place a trade's dollars are computed: manual logging and CSV import both call this, so the
+    // two can never disagree. `direction` must already be "LONG" or "SHORT".
+    //
+    // A short profits when price falls, so the sign of the move flips. No commission subtracted - see
+    // Instrument for why. A 50-point move on 5 MNQ contracts is exactly $500, the number a trader expects.
+    public double derivePnl(Instrument instrument, String direction, double entryPrice, double exitPrice,
+            int contracts) {
+        double priceMove = "LONG".equals(direction)
+                ? exitPrice - entryPrice
+                : entryPrice - exitPrice;
+        return round(priceMove * instrument.getPointValue() * contracts);
     }
 
     private String normalizeDirection(String direction) {
