@@ -571,7 +571,7 @@ the chosen prop account exactly as if logged by hand. Re-uploading the same file
 
 - [x] 1. Normalized model + `TopStepXParser` + parser tests
 - [x] 2. `POST /api/v1/imports/preview`
-- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch;
+- [x] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch;
      add `id asc` tie-break to `findAllByAccountIdOrderByTradeDateAsc`
 - [x] 4. Frontend "Import trades" modal
 
