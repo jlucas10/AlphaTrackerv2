@@ -2,12 +2,14 @@ package com.alphatracker.api;
 
 import com.alphatracker.api.account.Account;
 import com.alphatracker.api.account.AccountRepository;
+import com.alphatracker.api.account.AccountService;
 import com.alphatracker.api.account.AccountStatus;
 import com.alphatracker.api.account.AccountType;
 import com.alphatracker.api.importer.ImportPreviewResponse;
 import com.alphatracker.api.importer.ImportPreviewResponse.AccountCheckStatus;
 import com.alphatracker.api.importer.ImportPreviewResponse.Row;
 import com.alphatracker.api.importer.ImportPreviewResponse.RowStatus;
+import com.alphatracker.api.importer.ImportConflictException;
 import com.alphatracker.api.importer.ImportService;
 import com.alphatracker.api.importer.ImportSource;
 import com.alphatracker.api.importer.TopStepXParser;
@@ -21,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import java.util.Map;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -49,6 +53,9 @@ public class ImportServiceTest {
     @Mock
     private TradeRepository tradeRepository;
 
+    @Mock
+    private AccountService accountService;
+
     private ImportService importService;
     private User alice;
     private Account aliceAccount;
@@ -57,7 +64,7 @@ public class ImportServiceTest {
     @BeforeEach
     void setUp() {
         importService = new ImportService(List.of(new TopStepXParser()), accountRepository, tradeRepository,
-                new TradeService(tradeRepository, accountRepository));
+                new TradeService(tradeRepository, accountRepository), accountService);
         alice = User.builder().id(1L).email("alice@alphatracker.com").password("x").firstName("A").role(Role.USER).build();
         aliceAccount = account(10L, "Topstep 50k A");
         aliceSecond = account(11L, "Topstep 50k B");
@@ -290,5 +297,29 @@ public class ImportServiceTest {
 
         assertEquals(1, response.summary().errors());
         verify(tradeRepository, never()).findImportedExternalIds(anyLong(), any(), any(Collection.class));
+    }
+
+    @Test
+    @DisplayName("confirm: if the unique key refuses a write (a concurrent import won the race) the result is ImportConflictException and no account is saved")
+    void concurrentImportBecomesConflict() {
+        owns(aliceAccount);
+        when(tradeRepository.findImportedExternalIds(eq(10L), any(), anyCollection())).thenReturn(List.of());
+        when(tradeRepository.saveAll(any())).thenThrow(new DataIntegrityViolationException("uk_trade_account_source_external_id"));
+
+        assertThrows(ImportConflictException.class, () -> importService.confirm(ImportSource.TOPSTEPX, List.of(10L),
+                sample(), Map.of(), null, alice));
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("confirm: nothing is read or written when the account is not the caller's")
+    void confirmForeignAccountWritesNothing() {
+        when(accountRepository.findByIdAndUserId(99L, alice.getId())).thenReturn(Optional.empty());
+
+        assertThrows(SecurityException.class, () -> importService.confirm(ImportSource.TOPSTEPX, List.of(99L),
+                sample(), Map.of(), null, alice));
+
+        verifyNothingWritten();
     }
 }

@@ -66,7 +66,12 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
 
     // Chronological order because the drawdown engine replays balance forward
     // in time to find the high-water mark.
-    List<Trade> findAllByAccountIdOrderByTradeDateAsc(Long accountId);
+    //
+    // Explicit @Query (the method name is kept) so ties are broken by id: an import can create several trades
+    // with the same tradeDate (two exits of one entry), and PER_TRADE_CLOSE replays them one at a time, so an
+    // arbitrary order could change when the floor moves.
+    @Query("select t from Trade t where t.account.id = :accountId order by t.tradeDate asc, t.id asc")
+    List<Trade> findAllByAccountIdOrderByTradeDateAsc(@Param("accountId") Long accountId);
 
     // "Unassigned" trades: logged before the trader had a primary account, or
     // logged without picking one. Used to preview and then execute a backfill
