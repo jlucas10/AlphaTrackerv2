@@ -6,6 +6,7 @@ import { AccountSelector } from '../components/dashboard/AccountSelector';
 import { DrawdownGauge } from '../components/dashboard/DrawdownGauge';
 import { BackfillBanner } from '../components/dashboard/BackfillBanner';
 import { CreateAccountModal } from '../components/dashboard/CreateAccountModal';
+import { ImportTradesModal } from '../components/dashboard/ImportTradesModal';
 import { TradeEntryModal } from '../components/TradeEntryModal';
 import { computeAvgWinLoss, computeWinRate } from '../utils/pnlAggregations';
 import { fundedPrefillFrom, type AccountAction } from '../utils/accountActions';
@@ -35,6 +36,8 @@ const DashboardView: React.FC = () => {
 
   // Modal States
   const [isTradeModalOpen, setIsTradeModalOpen] = useState<boolean>(false);
+  // Mounted only while open, so every opening starts at step 1 with nothing left over from the last import.
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
   // null = closed. One piece of state instead of a boolean plus loose prefill state: a plain "+ Account"
   // opens it empty, a pass opens it prefilled. The modal is mounted only while this is set, so every
   // opening starts from fresh values.
@@ -137,12 +140,20 @@ const DashboardView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-6">
-            <button
-              onClick={() => setIsTradeModalOpen(true)}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
-            >
-              + Log Trade
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsImportOpen(true)}
+                className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-bold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                Import trades
+              </button>
+              <button
+                onClick={() => setIsTradeModalOpen(true)}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl transition-all shadow-xs cursor-pointer"
+              >
+                + Log Trade
+              </button>
+            </div>
 
             <div className="text-right">
               <p className="text-3xl font-black text-gray-900">
@@ -231,6 +242,18 @@ const DashboardView: React.FC = () => {
           accounts={accounts}
           defaultAccountId={selectedAccountId}
         />
+
+        {isImportOpen && (
+          <ImportTradesModal
+            onClose={() => setIsImportOpen(false)}
+            accounts={accounts}
+            defaultAccountId={selectedAccountId}
+            onImported={async () => {
+              await refetch();
+              await refetchAccounts();
+            }}
+          />
+        )}
 
         {createAccountForm && (
           <CreateAccountModal
