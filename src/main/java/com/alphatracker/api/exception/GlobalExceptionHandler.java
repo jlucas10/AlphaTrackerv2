@@ -11,6 +11,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import com.alphatracker.api.importer.ImportConflictException;
 import com.alphatracker.api.storage.StorageException;
 
 // Turns thrown exceptions into JSON the frontend can actually read.
@@ -34,6 +35,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.badRequest().body(Map.of("message", "Invalid value for '" + ex.getName() + "'."));
+    }
+
+    // Two imports of the same file racing each other: the database's unique key let one through and refused
+    // the other, which rolled back whole. Nothing was written by the loser, so the honest answer is 409.
+    @ExceptionHandler(ImportConflictException.class)
+    public ResponseEntity<Map<String, String>> handleImportConflict(ImportConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
     }
 
     // Ownership boundary violations from TradeService are a 403, not a 500.

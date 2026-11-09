@@ -1,6 +1,9 @@
 package com.alphatracker.api;
 
+import com.alphatracker.api.importer.ImportConfirmResponse;
+import com.alphatracker.api.importer.ImportConflictException;
 import com.alphatracker.api.importer.ImportController;
+import com.alphatracker.api.importer.ImportRowError;
 import com.alphatracker.api.importer.ImportPreviewResponse;
 import com.alphatracker.api.importer.ImportPreviewResponse.AccountCheck;
 import com.alphatracker.api.importer.ImportPreviewResponse.AccountCheckStatus;
@@ -27,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -173,6 +177,114 @@ public class ImportControllerTest {
     @DisplayName("no authentication is rejected, and the service is never reached (the slice answers 401; the full app answers an empty 403, see CONTEXT.md)")
     void unauthenticatedIsRejected() throws Exception {
         mockMvc.perform(multipart("/api/v1/imports/preview").file(file)
+                        .param("source", "TOPSTEPX").param("accountIds", "3").with(csrf()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(importService);
+    }
+
+    // ---- confirm ----
+
+    private ImportConfirmResponse confirmResponse() {
+        return new ImportConfirmResponse(ImportSource.TOPSTEPX, 20, 1, 1,
+                List.of(new ImportConfirmResponse.AccountResult(3L, "Topstep 50k", 20, 1, 50495.0, 50495.0, 48495.0,
+                        495.0, null, null, null)),
+                List.of(new ImportRowError(5, "7", "Unsupported contract 'XYZZ6'")));
+    }
+
+    @Test
+    @DisplayName("POST /imports/confirm returns created / skipped / failed and each account's new balance and floor")
+    void confirmReturnsSummary() throws Exception {
+        when(importService.confirm(eq(ImportSource.TOPSTEPX), eq(List.of(3L)), any(), eq(Map.of()), eq(null), eq(mockUser)))
+                .thenReturn(confirmResponse());
+
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file)
+                        .param("source", "TOPSTEPX").param("accountIds", "3")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.created").value(20))
+                .andExpect(jsonPath("$.skipped").value(1))
+                .andExpect(jsonPath("$.failed").value(1))
+                .andExpect(jsonPath("$.accounts[0].currentBalance").value(50495.0))
+                .andExpect(jsonPath("$.accounts[0].drawdownFloor").value(48495.0))
+                .andExpect(jsonPath("$.errors[0].line").value(5))
+                .andExpect(jsonPath("$.errors[0].message").value("Unsupported contract 'XYZZ6'"));
+    }
+
+    @Test
+    @DisplayName("confirm turns followedPlanYes / followedPlanNo / defaultFollowedPlan into the service's map and default")
+    void confirmPassesFollowedPlanChoices() throws Exception {
+        when(importService.confirm(any(), any(), any(), eq(Map.of("1", true, "2", true, "3", false)), eq(false), eq(mockUser)))
+                .thenReturn(confirmResponse());
+
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file)
+                        .param("source", "TOPSTEPX").param("accountIds", "3")
+                        .param("followedPlanYes", "1").param("followedPlanYes", "2")
+                        .param("followedPlanNo", "3").param("defaultFollowedPlan", "false")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("400: a trade marked both followed and not followed")
+    void confirmContradictoryFollowedPlanIs400() throws Exception {
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file)
+                        .param("source", "TOPSTEPX").param("accountIds", "3")
+                        .param("followedPlanYes", "1").param("followedPlanNo", "1")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("both")));
+        verifyNoInteractions(importService);
+    }
+
+    @Test
+    @DisplayName("confirm 400s: missing file, missing source, and a bad file or no account from the service")
+    void confirmBadRequests() throws Exception {
+        mockMvc.perform(multipart("/api/v1/imports/confirm").param("source", "TOPSTEPX").param("accountIds", "3")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Choose a file to upload."));
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file).param("accountIds", "3")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isBadRequest());
+
+        when(importService.confirm(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalArgumentException("Choose at least one account to import into."));
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file).param("source", "TOPSTEPX")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Choose at least one account to import into."));
+    }
+
+    @Test
+    @DisplayName("confirm 403: an account the user does not own")
+    void confirmForeignAccountIs403() throws Exception {
+        when(importService.confirm(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new SecurityException("Account not found or does not belong to user."));
+
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file)
+                        .param("source", "TOPSTEPX").param("accountIds", "99")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Account not found or does not belong to user."));
+    }
+
+    @Test
+    @DisplayName("confirm 409: a concurrent import won the race; nothing was saved")
+    void confirmRaceIs409() throws Exception {
+        when(importService.confirm(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new ImportConflictException("Some of these trades were imported by another request just now."));
+
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file)
+                        .param("source", "TOPSTEPX").param("accountIds", "3")
+                        .with(user(mockUser)).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("another request")));
+    }
+
+    @Test
+    @DisplayName("confirm without authentication is rejected and never reaches the service")
+    void confirmUnauthenticatedIsRejected() throws Exception {
+        mockMvc.perform(multipart("/api/v1/imports/confirm").file(file)
                         .param("source", "TOPSTEPX").param("accountIds", "3").with(csrf()))
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(importService);

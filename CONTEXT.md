@@ -580,8 +580,23 @@ the chosen prop account exactly as if logged by hand. Re-uploading the same file
      (created by `ddl-auto: update`; hand-logged trades have NULLs, which Postgres treats as distinct).
      _Checked live against local Postgres:_ 21 NEW / $495 total, 403 on another user's account, 400s for no file / bad
      source / non-CSV, 403 with no token, and `GET /trades` stayed empty (nothing written).
-- [ ] 3. `POST /api/v1/imports/confirm`: duplicates, ownership, account balance + drawdown after a back-dated batch;
-     add `id asc` tie-break to `findAllByAccountIdOrderByTradeDateAsc`
+- [x] 3. `POST /api/v1/imports/confirm` (same upload as preview, now written; 24 new tests, suite at 157).
+     ONE transaction for every trade in every chosen account; rejected rows are reported (`failed` + `errors`) and
+     do not stop valid ones. The file is re-parsed and re-checked on confirm (never trusts the preview). Duplicates
+     are skipped per account; the unique key is the backstop, and a lost race (two imports at once) rolls back whole
+     and returns **409**. Trades are stored exactly like hand-logged ones (same `derivePnl`, balance moved by
+     `TradeService.applyPnlToBalance`, saved once per account) plus `source`/`externalId`, `tradeDate` = entry time
+     in LA. **`followedPlan`:** `followedPlanYes` / `followedPlanNo` (repeated params of broker trade ids) and an
+     optional `defaultFollowedPlan`; unanswered stays null. The response gives, per account, the post-import
+     balance, high-water mark, floor, profit and the derived `suggestedStatus` / `breachedOn` (read from the same
+     replay as the dashboard, after the write); an import never changes account status by itself.
+     `findAllByAccountIdOrderByTradeDateAsc` now breaks ties by `id`. Integration tests run the real stack against
+     Postgres with balances worked out by hand (sample = 50,495 / floor 48,495; back-dated batch before a Nov 2
+     trade = 51,495; EOD vs per-trade HWM 50,100 vs 50,500; a -$2,000 import = breach/FAILED).
+     _Checked live over HTTP:_ confirm, re-confirm (0 created / 21 skipped), same file into a second account, 403 on
+     another user's account, and the dashboard's `/accounts` showing the same balance and floor.
+     _Known limit:_ the replay orders by ENTRY time (the owner's choice), so two overlapping trades are replayed in
+     entry order, not close order; only matters for PER_TRADE_CLOSE accounts with overlapping trades.
 - [ ] 4. Frontend "Import trades" modal (source, account(s), upload, preview table with follow-plan choice, confirm, summary)
 
 ### Backlog — Accounts Lifecycle & Management Page (not scheduled)

@@ -56,7 +56,7 @@ public class TradeService {
 
         if (targetAccount != null) {
             // Sync account live balance
-            targetAccount.setCurrentBalance(round(targetAccount.getCurrentBalance() + netProfitLoss));
+            applyPnlToBalance(targetAccount, netProfitLoss);
             accountRepository.save(targetAccount);
         }
         Trade trade = Trade.builder()
@@ -87,6 +87,12 @@ public class TradeService {
                 ? exitPrice - entryPrice
                 : entryPrice - exitPrice;
         return round(priceMove * instrument.getPointValue() * contracts);
+    }
+
+    // Moves an account's live balance by one trade's P&L (rounded to cents, as every other balance write is).
+    // Does NOT save: manual logging saves after each trade, an import saves once per account at the end.
+    public void applyPnlToBalance(Account account, double pnl) {
+        account.setCurrentBalance(round(account.getCurrentBalance() + pnl));
     }
 
     private String normalizeDirection(String direction) {
