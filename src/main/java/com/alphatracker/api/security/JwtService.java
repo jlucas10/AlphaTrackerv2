@@ -43,11 +43,16 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+        return generateToken(extraClaims, userDetails, EXPIRATION_TIME);
+    }
+
+    // Same token with a caller-chosen lifetime (the demo login uses a short one).
+    public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails, long ttlMillis) {
         return Jwts.builder()
                 .setClaims(extraClaims)
                 .setSubject(userDetails.getUsername()) // Sets our identifier (email)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .setExpiration(new Date(System.currentTimeMillis() + ttlMillis))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256) // Digitally signs token to prevent tampering
                 .compact();
     }

@@ -43,4 +43,18 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.id").doesNotExist())
                 .andExpect(content().string(not(containsString("secret-hash"))));
     }
+
+    @Test
+    @DisplayName("GET /users/me tells the frontend whether this is the demo account (to show the banner)")
+    void meReportsTheDemoFlag() throws Exception {
+        User demo = User.builder().id(7L).email("demo@alphatracker.app").password("x").firstName("Demo")
+                .role(Role.USER).demo(true).build();
+        User normal = User.builder().id(8L).email("jane@example.com").password("x").firstName("Jane")
+                .role(Role.USER).build();
+
+        mockMvc.perform(get("/api/v1/users/me").with(user(demo)))
+                .andExpect(jsonPath("$.demo").value(true));
+        mockMvc.perform(get("/api/v1/users/me").with(user(normal)))
+                .andExpect(jsonPath("$.demo").value(false));
+    }
 }

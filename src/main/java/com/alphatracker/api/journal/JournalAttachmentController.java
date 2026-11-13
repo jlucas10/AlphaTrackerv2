@@ -13,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.alphatracker.api.demo.BlockedForDemo;
 import com.alphatracker.api.storage.StorageException;
 import com.alphatracker.api.user.User;
 
@@ -30,6 +31,7 @@ public class JournalAttachmentController {
     // this controller only adapts the HTTP multipart shape into the plain
     // (InputStream, size, filename, contentType) shape the service and
     // StorageService both speak.
+    @BlockedForDemo
     @PostMapping(value = "/journal/{date}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<JournalAttachmentResponse> uploadAttachment(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

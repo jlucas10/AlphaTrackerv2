@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../api/apiClient';
 
 const AuthView: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Toggle state to switch between Login and Register modes
-  const [isRegistering, setIsRegistering] = useState<boolean>(false);
+  // Toggle state to switch between Login and Register modes. The demo banner's "Sign up" link opens the
+  // form already in register mode (?mode=register).
+  const [isRegistering, setIsRegistering] = useState<boolean>(searchParams.get('mode') === 'register');
   
   // Form input states
   const [email, setEmail] = useState<string>('');
@@ -108,6 +110,16 @@ const AuthView: React.FC = () => {
             {isRegistering ? 'Register Account' : 'Sign In'}
           </button>
         </form>
+
+        <div className="mt-6 pt-6 border-t border-gray-100">
+          <Link
+            to="/demo"
+            className="block w-full py-3 text-center bg-white hover:bg-gray-50 text-gray-900 font-bold text-sm rounded-lg border border-gray-300 transition-all"
+          >
+            Try the demo
+          </Link>
+          <p className="mt-2 text-center text-xs text-gray-400">No sign-up needed. Explore with sample data.</p>
+        </div>
 
         <div className="mt-6 text-center text-sm">
           <button 

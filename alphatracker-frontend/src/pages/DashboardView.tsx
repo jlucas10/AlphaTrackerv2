@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTrades } from '../hooks/useTrades';
 import { useAccount } from '../hooks/useAccounts';
 import { Sidebar } from '../components/layout/Sidebar';
+import { DemoBanner } from '../components/layout/DemoBanner';
 import { AccountSelector } from '../components/dashboard/AccountSelector';
 import { DrawdownGauge } from '../components/dashboard/DrawdownGauge';
 import { BackfillBanner } from '../components/dashboard/BackfillBanner';
@@ -95,7 +96,9 @@ const DashboardView: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
+    <div className="flex h-screen w-screen flex-col bg-gray-50 text-gray-800 font-sans overflow-hidden">
+      <DemoBanner />
+      <div className="flex flex-1 min-h-0">
       
       <Sidebar active="dashboard" />
 
@@ -277,6 +280,7 @@ const DashboardView: React.FC = () => {
         )}
 
       </main>
+      </div>
     </div>
   );
 };

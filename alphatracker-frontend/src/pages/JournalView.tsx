@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { useTrades } from '../hooks/useTrades';
 import { Sidebar } from '../components/layout/Sidebar';
+import { DemoBanner } from '../components/layout/DemoBanner';
 import { JournalCalendar } from '../components/journal/JournalCalendar';
 import { JournalDayPanel } from '../components/journal/JournalDayPanel';
 
@@ -28,7 +29,9 @@ const JournalView: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-gray-50 text-gray-800 font-sans overflow-hidden">
+    <div className="flex h-screen w-screen flex-col bg-gray-50 text-gray-800 font-sans overflow-hidden">
+      <DemoBanner />
+      <div className="flex flex-1 min-h-0">
       <Sidebar active="journal" />
 
       <main className="flex-1 overflow-y-auto p-8 space-y-6">
@@ -59,6 +62,7 @@ const JournalView: React.FC = () => {
 
         {selectedDate && <JournalDayPanel date={selectedDate} onClose={closeDay} />}
       </main>
+      </div>
     </div>
   );
 };

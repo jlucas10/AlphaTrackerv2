@@ -48,7 +48,9 @@ def create_app(settings: Settings | None = None, *, spring: Any = None, llm: LLM
 
     # One limiter for the whole process: its counts must be shared by every request thread.
     limiter = limiter or RateLimiter(settings.rate_limit_per_minute, settings.rate_limit_per_day,
-                                     settings.rate_limit_global_per_day)
+                                     settings.rate_limit_global_per_day,
+                                     demo_per_minute=settings.demo_rate_limit_per_minute,
+                                     demo_per_day=settings.demo_rate_limit_per_day)
     app.include_router(build_chat_router(settings, spring, get_llm, limiter))
 
     @app.get("/health")

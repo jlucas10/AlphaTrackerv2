@@ -14,6 +14,10 @@ public interface JournalAttachmentRepository extends JpaRepository<JournalAttach
     // without also proving it belongs to userId.
     Optional<JournalAttachment> findByIdAndJournalEntry_User_Id(Long id, Long userId);
 
+    // Every attachment on any of this user's journal days. Backs the demo reset, which must also delete the
+    // stored bytes, not just the rows.
+    List<JournalAttachment> findAllByJournalEntry_User_Id(Long userId);
+
     List<JournalAttachment> findAllByJournalEntry_IdOrderByUploadedAtAsc(Long journalEntryId);
 
     // long (not void) so callers can tell whether a row actually existed - a

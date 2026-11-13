@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from app.config import Settings
 from app.llm import LLMTurn
 from app.main import create_app
-from app.ratelimit import RateLimitExceeded, RateLimiter, user_key
+from app.ratelimit import RateLimitExceeded, RateLimiter, is_demo, user_key
 from app.spring_client import SpringAuthError
 from tests.fakes import FakeLLM
 
@@ -23,10 +23,10 @@ class Clock:
         return self.now
 
 
-def fake_jwt(sub: str, nonce: str = "") -> str:
+def fake_jwt(sub: str, nonce: str = "", **claims) -> str:
     """Looks like a JWT (header.payload.signature); `nonce` makes two logins of the same user differ."""
     b64 = lambda obj: base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
-    return f"{b64({'alg': 'HS256'})}.{b64({'sub': sub, 'n': nonce})}.sig"
+    return f"{b64({'alg': 'HS256'})}.{b64({'sub': sub, 'n': nonce, **claims})}.sig"
 
 
 def test_the_limiter_enforces_minute_day_and_global_windows_and_never_counts_a_rejection():
@@ -133,3 +133,56 @@ def test_chat_is_limited_per_user_after_authentication_and_before_any_model_call
 
     assert user_key(first_login) == user_key(second_login) == "sub:trader@x.com"
     assert user_key("not-a-jwt") == user_key("not-a-jwt") != user_key("another-garbage")   # unreadable: stable, per token
+
+
+def test_demo_users_get_tighter_per_user_limits_and_normal_users_are_unaffected():
+    clock = Clock()
+    limiter = RateLimiter(per_minute=10, per_day=100, global_per_day=1000, clock=clock,
+                          demo_per_minute=2, demo_per_day=3)
+
+    limiter.admit("demo", demo=True)
+    limiter.admit("demo", demo=True)
+    with pytest.raises(RateLimitExceeded) as minute:
+        limiter.admit("demo", demo=True)
+    assert minute.value.scope == "minute"
+
+    clock.now = 61
+    limiter.admit("demo", demo=True)                      # the 3rd of the day
+    clock.now = 122
+    with pytest.raises(RateLimitExceeded) as day:
+        limiter.admit("demo", demo=True)
+    assert day.value.scope == "day"                       # the demo's daily budget, far below the normal 100
+
+    for _ in range(10):                                   # a normal user still gets the normal 10 a minute
+        limiter.admit("trader")
+    with pytest.raises(RateLimitExceeded):
+        limiter.admit("trader")
+
+
+def test_a_limiter_with_no_demo_limits_treats_demo_like_everyone_else():
+    limiter = RateLimiter(per_minute=2, per_day=100, global_per_day=1000)
+    limiter.admit("demo", demo=True)
+    limiter.admit("demo", demo=True)
+    with pytest.raises(RateLimitExceeded):
+        limiter.admit("demo", demo=True)
+
+
+def test_demo_tokens_are_recognised_from_the_claim_and_garbage_is_not_demo():
+    assert is_demo(fake_jwt("demo@alphatracker.app", demo=True)) is True
+    assert is_demo(fake_jwt("trader@x.com")) is False
+    assert is_demo(fake_jwt("trader@x.com", demo="true")) is False      # only a real boolean true counts
+    assert is_demo("not-a-jwt") is False
+
+
+def test_chat_applies_the_tighter_demo_limit_to_demo_tokens_only():
+    llm = FakeLLM([LLMTurn("ok", [])] * 10)
+    limiter = RateLimiter(per_minute=5, per_day=100, global_per_day=1000, demo_per_minute=1, demo_per_day=10)
+    client = TestClient(create_app(Settings(_env_file=None), spring=SelectiveSpring(), llm=llm, limiter=limiter))
+    ask = lambda token: client.post("/chat", headers={"Authorization": f"Bearer {token}"}, json={"message": "hi"})
+
+    demo = fake_jwt("demo@alphatracker.app", "1", demo=True)
+    assert ask(demo).status_code == 200
+    assert ask(fake_jwt("demo@alphatracker.app", "2", demo=True)).status_code == 429   # 1 a minute, shared by every visitor
+
+    trader = fake_jwt("trader@x.com")
+    assert [ask(trader).status_code for _ in range(3)] == [200, 200, 200]

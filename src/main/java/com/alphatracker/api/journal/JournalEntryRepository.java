@@ -15,6 +15,8 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, Long
     // table).
     Optional<JournalEntry> findByUser_IdAndEntryDate(Long userId, LocalDate entryDate);
 
+    List<JournalEntry> findAllByUser_Id(Long userId);
+
     // Backs GET /api/v1/journal?from=&to=. Both ends inclusive. Between is
     // safe HERE - and only here - because entryDate is a LocalDate with no time
     // component; the same keyword on Trade.tradeDate (a LocalDateTime) is what

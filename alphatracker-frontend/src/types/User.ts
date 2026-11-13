@@ -4,4 +4,6 @@ export interface CurrentUser {
   firstName: string;
   lastName: string | null;
   email: string;
+  // True for the shared recruiter demo account (drives the banner and hides upload controls).
+  demo: boolean;
 }
