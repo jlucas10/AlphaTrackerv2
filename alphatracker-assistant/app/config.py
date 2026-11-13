@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=10, ge=1)
     rate_limit_per_day: int = Field(default=100, ge=1)
     rate_limit_global_per_day: int = Field(default=1000, ge=1)
+    # Tighter per-user limits for the shared demo account (a token with the `demo` claim). All demo visitors
+    # share one user key, so the daily number is the demo's whole daily budget.
+    demo_rate_limit_per_minute: int = Field(default=3, ge=1)
+    demo_rate_limit_per_day: int = Field(default=30, ge=1)
 
     # Comma-separated extra origins (e.g. the Vercel URL in production).
     # Any http://localhost:<port> is always allowed for local development.

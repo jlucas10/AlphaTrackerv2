@@ -5,6 +5,7 @@ import { AssistantProvider } from './context/AssistantContext';
 import { ChatPanel } from './components/assistant/ChatPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthView from './pages/AuthView';
+import DemoView from './pages/DemoView';
 import DashboardView from './pages/DashboardView';
 import JournalView from './pages/JournalView';
 
@@ -33,6 +34,9 @@ const App: React.FC = () => {
         <Routes>
           {/* Public Route: Anyone can see this screen */}
           <Route path="/login" element={<AuthView />} />
+
+          {/* Public: one-click demo login for visitors without an account */}
+          <Route path="/demo" element={<DemoView />} />
 
           {/* Protected Route: Wrapped inside our security gatekeeper */}
           <Route 

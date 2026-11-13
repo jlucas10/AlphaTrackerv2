@@ -1,4 +1,5 @@
 import React, { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { ALLOWED_ATTACHMENT_CONTENT_TYPES, MAX_ATTACHMENT_SIZE_BYTES } from '../../types/Attachment';
 
 interface AttachmentDropzoneProps {
@@ -37,6 +38,8 @@ function validate(file: File): string | null {
 // screens reuse it without forcing one flow onto the other.
 export const AttachmentDropzone = forwardRef<AttachmentDropzoneHandle, AttachmentDropzoneProps>(
   ({ onFilesSelected, disabled, theme = 'dark' }, ref) => {
+  // The shared demo account cannot upload files (the server answers 403), so offer no control for it.
+  const isDemo = useAuth().user?.demo === true;
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +47,7 @@ export const AttachmentDropzone = forwardRef<AttachmentDropzoneHandle, Attachmen
   const acceptFiles = useCallback(
     (fileList: FileList | File[]) => {
       const files = Array.from(fileList);
-      if (files.length === 0) return;
+      if (files.length === 0 || isDemo) return;
 
       const firstError = files.map(validate).find((e) => e !== null);
       if (firstError) {
@@ -54,7 +57,7 @@ export const AttachmentDropzone = forwardRef<AttachmentDropzoneHandle, Attachmen
       setValidationError(null);
       onFilesSelected(files);
     },
-    [onFilesSelected],
+    [onFilesSelected, isDemo],
   );
 
   useImperativeHandle(ref, () => ({ acceptFiles }), [acceptFiles]);
@@ -74,6 +77,16 @@ export const AttachmentDropzone = forwardRef<AttachmentDropzoneHandle, Attachmen
   const primaryTextClass = isDark ? 'text-neutral-400' : 'text-gray-500';
   const secondaryTextClass = isDark ? 'text-neutral-600' : 'text-gray-400';
   const fontClass = isDark ? 'font-mono' : 'font-semibold';
+
+  if (isDemo) {
+    return (
+      <div className={`rounded-lg border-2 border-dashed px-4 py-4 text-center ${isDark ? 'border-neutral-800 bg-neutral-950' : 'border-gray-200 bg-gray-50'}`}>
+        <p className={`text-xs ${fontClass} ${secondaryTextClass}`}>
+          Screenshot uploads are turned off in the demo account. Sign up to attach charts.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

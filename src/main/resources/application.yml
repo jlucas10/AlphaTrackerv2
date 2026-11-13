@@ -60,3 +60,15 @@ application:
       region: ${S3_REGION}
       access-key-id: ${S3_ACCESS_KEY_ID}
       secret-access-key: ${S3_SECRET_ACCESS_KEY}
+  demo:
+    # Master switch: false disables the demo login, the startup seed and the daily reset.
+    enabled: ${DEMO_ENABLED:true}
+    email: ${DEMO_EMAIL:demo@alphatracker.app}
+    token-ttl-minutes: ${DEMO_TOKEN_TTL_MINUTES:60}
+    # Spring cron (sec min hour day month weekday), evaluated in UTC.
+    reset-cron: ${DEMO_RESET_CRON:0 0 4 * * *}
+    # Per-IP cap on POST /auth/demo within a rolling hour.
+    rate-limit-per-hour: ${DEMO_RATE_LIMIT_PER_HOUR:20}
+    # How many proxy hops sit in front of the app (Railway edge = 1). The client IP is taken that many
+    # entries from the RIGHT of X-Forwarded-For, because the left entries are client-controlled and spoofable.
+    trusted-proxy-hops: ${DEMO_TRUSTED_PROXY_HOPS:1}

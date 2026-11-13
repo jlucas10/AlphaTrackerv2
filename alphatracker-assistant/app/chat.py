@@ -10,7 +10,7 @@ from app.config import Settings
 from app.llm import LLM, AssistantNotConfigured, LLMError, Message
 from app.periods import today_in
 from app.prompts import build_context, build_system_prompt
-from app.ratelimit import RateLimiter, RateLimitExceeded, user_key
+from app.ratelimit import RateLimiter, RateLimitExceeded, is_demo, user_key
 from app.spring_client import SpringAuthError, SpringUnavailable
 from app.tools import ToolRunner
 
@@ -77,7 +77,7 @@ def build_chat_router(settings: Settings, spring: Any, get_llm: Callable[[], LLM
                 message=request.message,
                 history=to_messages((t.role, t.content) for t in request.history),
                 today=today_in(settings.timezone),
-                before_model=lambda: limiter.admit(user_key(token)),
+                before_model=lambda: limiter.admit(user_key(token), demo=is_demo(token)),
             )
         except RateLimitExceeded as exc:
             logger.info("rate limited (%s limit)", exc.scope)  # the scope only; never the user or the token

@@ -57,6 +57,17 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    // Marks the shared recruiter demo account. NULLABLE (null reads as false) because ddl-auto=update cannot
+    // add a NOT NULL column to a table that already holds rows - same reason as Account.status.
+    private Boolean demo;
+
+    // Not a getter for Lombok's sake: Lombok generates getDemo() for a Boolean, and this null-safe helper is
+    // what the rest of the code reads. Field access (the @Id is on a field) means JPA ignores it.
+    @JsonIgnore
+    public boolean isDemo() {
+        return Boolean.TRUE.equals(demo);
+    }
+
     // Spring Security UserDetails Implementation
 
     @Override

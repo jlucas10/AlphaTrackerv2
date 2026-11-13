@@ -56,6 +56,11 @@ public class AuthenticationService {
         var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password."));
         
+        // The demo account has no usable password; it is only reachable through POST /auth/demo.
+        if (user.isDemo()) {
+            throw new IllegalArgumentException("Invalid email or password.");
+        }
+
         var jwtToken = jwtService.generateToken(user);
         return AuthenticationResponse.builder()
                 .token(jwtToken)

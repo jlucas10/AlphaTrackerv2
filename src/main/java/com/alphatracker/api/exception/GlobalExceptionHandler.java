@@ -11,7 +11,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+import com.alphatracker.api.demo.DemoForbiddenException;
 import com.alphatracker.api.importer.ImportConflictException;
+import com.alphatracker.api.security.RateLimitExceededException;
 import com.alphatracker.api.storage.StorageException;
 
 // Turns thrown exceptions into JSON the frontend can actually read.
@@ -71,5 +73,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(Map.of("message", "Uploaded file exceeds the maximum allowed size."));
+    }
+
+    // Too many demo logins from one IP. Retry-After tells a well-behaved client how long to wait.
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Map<String, String>> handleRateLimited(RateLimitExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(Map.of("message", "Too many requests. Please try again shortly."));
+    }
+
+    // An action the shared demo account is not allowed to take (see @BlockedForDemo).
+    @ExceptionHandler(DemoForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleDemoForbidden(DemoForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", ex.getMessage()));
     }
 }

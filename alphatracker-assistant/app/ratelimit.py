@@ -38,19 +38,28 @@ class RateLimitExceeded(Exception):
 
 class RateLimiter:
     def __init__(self, per_minute: int, per_day: int, global_per_day: int,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic,
+                 demo_per_minute: int | None = None, demo_per_day: int | None = None):
         self._per_minute, self._per_day, self._global = per_minute, per_day, global_per_day
+        # The shared recruiter demo account gets tighter per-user limits (it is open to anyone with the link,
+        # and every admitted request spends Gemini budget). Unset means "same as everyone".
+        self._demo_per_minute = demo_per_minute if demo_per_minute is not None else per_minute
+        self._demo_per_day = demo_per_day if demo_per_day is not None else per_day
         self._clock = clock  # injectable, so tests move time instead of sleeping
         self._events: dict[tuple[str, str], deque[float]] = {}  # (scope, user) -> admit timestamps
         self._lock = threading.Lock()
         self._admitted = 0
 
-    def admit(self, user_key: str) -> None:
-        """Let this user's request through, or raise RateLimitExceeded. Records it only if admitted."""
+    def admit(self, user_key: str, demo: bool = False) -> None:
+        """Let this user's request through, or raise RateLimitExceeded. Records it only if admitted.
+
+        `demo` swaps in the tighter demo per-user limits; the global daily cap applies either way."""
         now = self._clock()
+        per_minute = self._demo_per_minute if demo else self._per_minute
+        per_day = self._demo_per_day if demo else self._per_day
         limits = (
-            ("minute", (user_key, "minute"), self._per_minute, MINUTE),
-            ("day", (user_key, "day"), self._per_day, DAY),
+            ("minute", (user_key, "minute"), per_minute, MINUTE),
+            ("day", (user_key, "day"), per_day, DAY),
             ("global", ("*", "day"), self._global, DAY),
         )
         with self._lock:
@@ -75,6 +84,20 @@ class RateLimiter:
         for key in [k for k, events in self._events.items()
                     if not events or events[-1] <= now - (MINUTE if k[1] == "minute" else DAY)]:
             del self._events[key]
+
+
+def is_demo(token: str) -> bool:
+    """Whether the JWT carries Spring's `demo: true` claim (issued only by POST /auth/demo).
+
+    Same caveat as user_key: the payload is read WITHOUT checking the signature, which is safe only after the
+    preflight GET /accounts succeeded. And it can only ever make a caller's limits TIGHTER than normal, so
+    there is nothing for a forged claim to gain."""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(payload)).get("demo") is True
+    except (IndexError, ValueError, AttributeError, TypeError):
+        return False
 
 
 def user_key(token: str) -> str:

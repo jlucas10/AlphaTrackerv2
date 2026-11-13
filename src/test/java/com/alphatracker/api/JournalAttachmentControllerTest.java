@@ -83,6 +83,36 @@ public class JournalAttachmentControllerTest {
     }
 
     @Test
+    @DisplayName("demo user: upload is blocked with a 403 and a clear message, and the service is never called")
+    void uploadIsForbiddenForDemoUser() throws Exception {
+        User demoUser = User.builder()
+                .id(2L).email("demo@alphatracker.app").password("unusable")
+                .firstName("Demo").role(Role.USER).demo(true).build();
+        MockMultipartFile file = new MockMultipartFile("file", "chart.png", "image/png", "bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/journal/2026-09-18/attachments")
+                        .file(file)
+                        .with(user(demoUser))
+                        .with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("demo account")));
+
+        verifyNoInteractions(attachmentService);
+    }
+
+    @Test
+    @DisplayName("demo user can still read attachments (only uploads are blocked)")
+    void demoUserCanStillListAttachments() throws Exception {
+        User demoUser = User.builder()
+                .id(2L).email("demo@alphatracker.app").password("unusable")
+                .firstName("Demo").role(Role.USER).demo(true).build();
+        when(attachmentService.getAttachmentsForDate(eq(day), eq(demoUser))).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/journal/2026-09-18/attachments").with(user(demoUser)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("GET /journal-attachments/{id}/file streams the bytes with the stored Content-Type")
     void getAttachmentFileStreamsBytesWithContentType() throws Exception {
         JournalAttachment attachment = JournalAttachment.builder()
